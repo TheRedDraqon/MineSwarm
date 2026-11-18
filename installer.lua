@@ -23,7 +23,7 @@ local function prompt(text, default)
 end
 
 local defaultBaseUrl = "https://raw.githubusercontent.com/TheRedDraqon/MineSwarm/refs/heads/master"
-local baseUrl = prompt("Raw source base URL", defaultBaseUrl)
+local baseUrl = defaultBaseUrl
 if not baseUrl or baseUrl == "" then error("A source base URL is required") end
 baseUrl = baseUrl:gsub("/+$", "")
 local role = prompt("Install role (master/deployer/drone/gps)")
