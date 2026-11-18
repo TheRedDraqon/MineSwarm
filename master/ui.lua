@@ -27,6 +27,8 @@ function M.new(monitor, state, settings, actions)
     depth = 50,
     scroll = 0,
     message = "Ready",
+    inputField = nil,
+    inputBuffer = "",
   }
   monitor.setTextScale(0.5)
 
@@ -34,14 +36,15 @@ function M.new(monitor, state, settings, actions)
     return monitor.getSize()
   end
 
-  local function button(x, y, width, text, callback, color)
+  local function button(x, y, width, text, callback, color, inputField)
     if x < 1 or y < 1 then return end
     monitor.setBackgroundColor(color or colors.gray)
     monitor.setTextColor(colors.white)
     monitor.setCursorPos(x, y)
     monitor.write(clipped(text, width))
     ui.buttons[#ui.buttons + 1] = {
-      x1 = x, y1 = y, x2 = x + width - 1, y2 = y, callback = callback,
+      x1 = x, y1 = y, x2 = x + width - 1, y2 = y,
+      callback = callback, inputField = inputField,
     }
   end
 
@@ -166,22 +169,39 @@ function M.new(monitor, state, settings, actions)
       originText = tostring(origin.x) .. ", " .. tostring(origin.z)
     end
     line(2, 7, width - 4, "X/Z origin: " .. originText .. "  (set in master_config)")
-    line(2, 8, width - 4, "Automatic ore depth: sweet-range inclusive; layers use selected depth.")
+    if ui.settings.configured then
+      line(2, 8, width - 4, "Tap a value to type an exact number on the computer keyboard.")
+    else
+      line(2, 8, width - 4, "FOB not configured: press C, then enter FOB and quarry coordinates.", colors.yellow)
+    end
     button(2, 10, 10, "-16 WIDTH", function() ui.width = math.max(1, ui.width - 16) end)
     button(13, 10, 10, "+16 WIDTH", function() ui.width = ui.width + 16 end)
     button(24, 10, 10, "+64 WIDTH", function() ui.width = ui.width + 64 end)
     button(35, 10, 10, "+100 WIDTH", function() ui.width = ui.width + 100 end)
-    line(47, 10, width - 48, "WIDTH: " .. ui.width)
+    local valueWidth = math.max(1, math.min(28, width - 47))
+    button(47, 10, valueWidth, "WIDTH: " .. ui.width, function()
+      ui.inputField, ui.inputBuffer = "width", ""
+    end, ui.inputField == "width" and colors.orange or colors.gray, "width")
     button(2, 12, 10, "-16 LENGTH", function() ui.length = math.max(1, ui.length - 16) end)
     button(13, 12, 10, "+16 LENGTH", function() ui.length = ui.length + 16 end)
     button(24, 12, 10, "+64 LENGTH", function() ui.length = ui.length + 64 end)
     button(35, 12, 10, "+100 LENGTH", function() ui.length = ui.length + 100 end)
-    line(47, 12, width - 48, "LENGTH: " .. ui.length)
+    button(47, 12, valueWidth, "LENGTH: " .. ui.length, function()
+      ui.inputField, ui.inputBuffer = "length", ""
+    end, ui.inputField == "length" and colors.orange or colors.gray, "length")
     button(2, 14, 10, "-1 DEPTH", function() ui.depth = math.max(1, ui.depth - 1) end)
     button(13, 14, 10, "+1 DEPTH", function() ui.depth = ui.depth + 1 end)
-    line(26, 14, 18, "DEPTH: " .. ui.depth)
+    button(26, 14, 18, "DEPTH: " .. ui.depth, function()
+      ui.inputField, ui.inputBuffer = "depth", ""
+    end, ui.inputField == "depth" and colors.orange or colors.gray, "depth")
     local y1, y2 = oreDb.jobY(ui.mode, selected, ui.depth)
-    line(47, 14, width - 48, y1 and ("Y: " .. y1 .. ".." .. y2) or tostring(y2))
+    line(47, 14, valueWidth, y1 and ("Y: " .. y1 .. ".." .. y2) or tostring(y2))
+    if ui.inputField then
+      line(2, 16, width - 4, "NEW " .. ui.inputField:upper() .. ": " .. ui.inputBuffer
+        .. "  Enter=apply  Esc=cancel  (type on computer)", colors.yellow)
+    else
+      line(2, 16, width - 4, "Tap a dimension value to type its exact amount on the computer.")
+    end
     button(2, math.max(17, height - 4), width - 3, "LAUNCH SWARM JOB",
       function() actions.launch(ui.mode, ui.selectedPreset, ui.width, ui.length, ui.depth) end, colors.green)
     line(2, height, width - 2, ui.message, colors.yellow)
@@ -253,6 +273,7 @@ function M.new(monitor, state, settings, actions)
     monitor.setBackgroundColor(colors.black)
     monitor.clear()
     tabBar(width)
+    line(1, 2, width, "Q quits to shell  |  C edits FOB and deployer settings", colors.gray)
     if ui.tab == 1 then drawOverview(width, height)
     elseif ui.tab == 2 then drawSetup(width, height)
     elseif ui.tab == 3 then drawDrones(width, height)
@@ -262,11 +283,40 @@ function M.new(monitor, state, settings, actions)
   function ui.touch(x, y)
     for _, area in ipairs(ui.buttons) do
       if x >= area.x1 and x <= area.x2 and y >= area.y1 and y <= area.y2 then
+        if ui.inputField and area.inputField ~= ui.inputField then
+          ui.inputField, ui.inputBuffer = nil, ""
+        end
         area.callback()
         return true
       end
     end
     return false
+  end
+
+  function ui.handleInput(eventName, value)
+    if not ui.inputField then return false end
+    if eventName == "char" then
+      if type(value) == "string" and value:match("^%d$") and #ui.inputBuffer < 12 then
+        ui.inputBuffer = ui.inputBuffer .. value
+      end
+      return true
+    end
+    if eventName ~= "key" then return false end
+    if value == keys.backspace then
+      ui.inputBuffer = ui.inputBuffer:sub(1, -2)
+    elseif value == keys.escape then
+      ui.inputField, ui.inputBuffer = nil, ""
+    elseif value == keys.enter or value == keys.numPadEnter then
+      local amount = tonumber(ui.inputBuffer)
+      if amount and amount > 0 and amount % 1 == 0 then
+        ui[ui.inputField] = amount
+        ui.inputField, ui.inputBuffer = nil, ""
+        ui.message = "Exact dimension applied"
+      else
+        ui.message = "Enter a positive whole number"
+      end
+    end
+    return true
   end
 
   function ui.setMessage(message)

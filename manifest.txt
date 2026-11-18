@@ -1,4 +1,4 @@
-version=1.0.0
+version=1.0.1
 
 [common]
 update.lua
@@ -12,6 +12,7 @@ shared/pose.lua
 master/ore_db.lua
 master/partition.lua
 master/ui.lua
+master/config_editor.lua
 master/main.lua
 
 [deployer]

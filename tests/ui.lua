@@ -10,6 +10,7 @@ colors = {
   yellow = 7, red = 8, magenta = 9, orange = 10, green = 11,
 }
 os.epoch = function() return os.time() * 1000 end
+keys = { backspace = 1, enter = 2, numPadEnter = 3, escape = 4 }
 
 local monitor = {
   setTextScale = function() end,
@@ -56,16 +57,20 @@ local ui = uiLib.new(monitor, state, { home = { x = 0, z = 0 }, origin = { x = 0
 })
 
 ui.draw()
+ui.touch(25, 1)
+ui.draw()
+ui.touch(50, 10)
+ui.handleInput("char", "1")
+ui.handleInput("char", "7")
+ui.handleInput("key", keys.enter)
+assert(ui.width == 17, "clicking the width field should accept an exact keyboard value")
+ui.draw()
+ui.touch(10, 26)
+assert(calls.launched)
 ui.touch(45, 1)
 ui.draw()
 ui.touch(5, 5)
 ui.draw()
-ui.touch(25, 1)
-ui.draw()
-ui.touch(30, 5)
-ui.draw()
-ui.touch(10, 26)
-assert(calls.launched)
 ui.touch(65, 1)
 ui.draw()
 ui.touch(39, 7)

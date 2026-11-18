@@ -7,6 +7,7 @@ local stateLib = require("shared.state")
 local oreDb = require("master.ore_db")
 local partition = require("master.partition")
 local uiLib = require("master.ui")
+local configEditor = require("master.config_editor")
 
 local dataPath = config.stateFile
 local state = stateLib.load(dataPath, {
@@ -181,6 +182,9 @@ local actions = {
 }
 
 ui = uiLib.new(monitor, state, settings, actions)
+if settings.configured ~= true then
+  ui.setMessage("Master not configured - press C to set FOB coordinates")
+end
 
 local function recordWaypoint(packet)
   local pos = packet.pos or packet.position
@@ -278,10 +282,22 @@ local timer = os.startTimer(1)
 
 while true do
   local event = { os.pullEventRaw() }
-  if net.isModemMessage(event) then
+  if event[1] == "key" and event[2] == keys.q then
+    print("MineSwarm master stopped. Returned to the shell.")
+    break
+  elseif event[1] == "key" and event[2] == keys.c then
+    configEditor.run(settings, function(updatedSettings)
+      stateLib.save(updatedSettings, settingsPath)
+    end)
+    ui.setMessage("Master configuration saved")
+    ui.draw()
+  elseif net.isModemMessage(event) then
     handlePacket(event[5])
   elseif event[1] == "monitor_touch" and event[2] == monitorName then
     ui.touch(event[3], event[4])
+    ui.draw()
+  elseif event[1] == "char" or event[1] == "key" then
+    if ui.handleInput(event[1], event[2]) then ui.draw() end
   elseif event[1] == "timer" and event[2] == timer then
     local now = os.clock()
     for label, drone in pairs(state.drones) do
@@ -318,5 +334,5 @@ while true do
     ui.draw()
     timer = os.startTimer(1)
   end
-  if event[1] == "monitor_touch" or net.isModemMessage(event) then ui.draw() end
+  if net.isModemMessage(event) then ui.draw() end
 end

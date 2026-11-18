@@ -2,7 +2,7 @@ local roles = {
   master = {
     "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",
     "shared/pose.lua", "master/ore_db.lua", "master/partition.lua",
-    "master/ui.lua", "master/main.lua", "update.lua",
+    "master/ui.lua", "master/config_editor.lua", "master/main.lua", "update.lua",
   },
   deployer = {
     "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",

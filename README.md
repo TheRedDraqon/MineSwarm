@@ -121,16 +121,26 @@ and deployment is downward.
 
 ## Running jobs
 
-1. Confirm online labeled turtles on the **DRONES** tab.
-2. On **JOB SETUP**, choose `ORE` or `LAYER`, select a range, set width/length
-   and (for layers) depth, then launch. Ore mode always uses the database's
-   inclusive sweet range. Layer depth starts at the preset's maximum Y and
-   extends downward, bounded by that layer's minimum.
-3. The origin is the configured FOB X/Z. Width extends toward positive X and
+1. Press **C** on the master computer to open the configuration editor. Enter
+   the FOB miner parking X/Y/Z, its facing (`0=north, 1=east, 2=south, 3=west`),
+   the quarry origin X/Z, and the deployer computer label. Press Enter to keep
+   any displayed value. Saving marks the master configured.
+2. Confirm online labeled turtles on the **DRONES** tab.
+3. On **JOB SETUP**, choose `ORE` or `LAYER`, select a range, set width/length
+   and (for layers) depth, then launch. Tap a dimension value to select it; the
+   field highlights, and you can type an exact positive integer on the master
+   keyboard and press Enter. Ore mode always uses the database's inclusive
+   sweet range. Layer depth starts at the preset's maximum Y and extends
+   downward, bounded by that layer's minimum.
+4. The origin is the configured quarry X/Z. Width extends toward positive X and
    length toward positive Z.
-4. Use **OVERVIEW** for status and **LEDGER** for waypoints and deposited yield.
+5. Use **OVERVIEW** for status and **LEDGER** for waypoints and deposited yield.
    Clearing a waypoint removes only its ledger entry; it does not mine or
    otherwise change the world.
+
+Press **Q** on the master computer to exit the C2 program and return to the
+shell. This does not pause or recall turtles; use the monitor controls first if
+the swarm should stop.
 
 The master uses all online idle/complete turtles available at launch. A turtle
 in `ERROR` is deliberately not reused until its fault is investigated.
@@ -172,7 +182,8 @@ and its sector before manually recovering or restarting that job.
 Run the host-side tests from this directory with Lua 5.2+:
 
 ```sh
-lua tests/partition.lua && lua tests/pose.lua && lua tests/ui.lua && lua tests/update.lua
+lua tests/partition.lua && lua tests/pose.lua && lua tests/ui.lua \
+  && lua tests/update.lua && lua tests/config_editor.lua
 ```
 
 For syntax validation, run `luac -p` on each Lua file. CC:Tweaked in-world
