@@ -161,6 +161,11 @@ local function alert(blockName, position, onProtected)
   if onProtected then onProtected(blockName, position) end
 end
 
+local function blockAt(data, position)
+  return tostring(data and data.name or "unknown block") .. " at "
+    .. position.x .. "," .. position.y .. "," .. position.z
+end
+
 local function moveHorizontal(pose, direction, onProtected, onStep)
   M.turnTo(pose, direction)
   local vector = delta[direction]
@@ -170,13 +175,13 @@ local function moveHorizontal(pose, direction, onProtected, onStep)
     if found then
       if isProtected(data) then
         alert(data.name, destination, onProtected)
-        return false, "protected block"
+        return false, "protected block " .. blockAt(data, destination)
       end
       if isTurtle(data) then
         os.sleep(math.random(5, 20) / 10)
       elseif not turtle.dig() then
         alert(data.name or "undiggable", destination, onProtected)
-        return false, "dig failed: " .. tostring(data.name)
+        return false, "dig failed: " .. blockAt(data, destination)
       end
     end
     if turtle.forward() then
@@ -190,13 +195,13 @@ local function moveHorizontal(pose, direction, onProtected, onStep)
       local blocked, block = turtle.inspect()
       if blocked and isProtected(block) then
         alert(block.name, destination, onProtected)
-        return false, "protected block"
+        return false, "protected block " .. blockAt(block, destination)
       end
       if not blocked or isTurtle(block) then
         os.sleep(math.random(5, 20) / 10)
       elseif not turtle.dig() then
         alert(block.name or "undiggable", destination, onProtected)
-        return false, "dig failed: " .. tostring(block.name)
+        return false, "dig failed: " .. blockAt(block, destination)
       end
     end
   end
@@ -218,13 +223,13 @@ local function moveVertical(pose, amount, onProtected, onStep)
       if found then
         if isProtected(data) then
           alert(data.name, destination, onProtected)
-          return false, "protected block"
+          return false, "protected block " .. blockAt(data, destination)
         end
         if isTurtle(data) then
           os.sleep(math.random(5, 20) / 10)
         elseif not dig() then
           alert(data.name or "undiggable", destination, onProtected)
-          return false, direction .. " dig failed: " .. tostring(data.name)
+          return false, direction .. " dig failed: " .. blockAt(data, destination)
         end
       end
       if move() then
@@ -239,7 +244,7 @@ local function moveVertical(pose, amount, onProtected, onStep)
         local blocked, block = inspect()
         if blocked and isProtected(block) then
           alert(block.name, destination, onProtected)
-          return false, "protected block"
+          return false, "protected block " .. blockAt(block, destination)
         elseif blocked and isTurtle(block) then
           os.sleep(math.random(5, 20) / 10)
         elseif blocked and attempt == 10 then

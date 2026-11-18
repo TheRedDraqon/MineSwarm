@@ -35,8 +35,14 @@ local state = {
   },
   drones = {
     Miner_1 = {
-      online = true, state = "MINING", pos = { x = 10, y = -1, z = 10 },
-      dir = 0, fuel = 5000, inventory = 4, task = "test:S01",
+      online = true, state = "IDLE", pos = { x = 10, y = -1, z = 10 },
+      dir = 0, fuel = 5000, inventory = 4, task = nil,
+      home = { x = 0, y = 64, z = 0, dir = 0 },
+    },
+    Miner_2 = {
+      online = true, state = "IDLE", pos = { x = 20, y = 64, z = 20 },
+      dir = 1, fuel = 5000, inventory = 0,
+      home = { x = 20, y = 64, z = 20, dir = 1 },
     },
   },
   waypoints = {
@@ -59,6 +65,8 @@ local ui = uiLib.new(monitor, state, { home = { x = 0, z = 0 }, origin = { x = 0
 ui.draw()
 ui.touch(25, 1)
 ui.draw()
+ui.touch(5, 7)
+assert(ui.selectedDrone == "Miner_2", "simple job setup should allow selecting an idle drone")
 ui.touch(50, 10)
 ui.handleInput("char", "1")
 ui.handleInput("char", "7")

@@ -20,6 +20,20 @@ state.label = label
 local pose, poseReason = poseLib.calibrate()
 if not pose then error(poseReason) end
 state.pose = pose
+if not state.task then
+  state.home = {
+    x = pose.x,
+    y = pose.y,
+    z = pose.z,
+    dir = pose.dir,
+    dropDir = (pose.dir + 2) % 4,
+  }
+elseif not state.home then
+  state.home = state.task.home or {
+    x = pose.x, y = pose.y, z = pose.z, dir = pose.dir, dropDir = (pose.dir + 2) % 4,
+  }
+end
+stateLib.save(state, dataPath)
 
 local paused = false
 local recallRequested = false
@@ -38,6 +52,7 @@ local function sendHeartbeat()
     label = label,
     computerId = os.getComputerID(),
     pos = { x = pose.x, y = pose.y, z = pose.z },
+    home = state.home,
     dir = pose.dir,
     fuel = turtle.getFuelLevel(),
     inventory = slots,

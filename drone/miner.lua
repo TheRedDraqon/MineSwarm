@@ -72,7 +72,8 @@ local function clearColumn(pose, task, callbacks)
 end
 
 local function unloadAtHome(pose, task, callbacks, fuelTarget)
-  if task.home.dir ~= nil then poseLib.turnTo(pose, task.home.dir) end
+  local dropDirection = task.home.dropDir or task.home.dir
+  if dropDirection ~= nil then poseLib.turnTo(pose, dropDirection) end
   local before = countItems()
   for slot = 1, 16 do
     if turtle.getItemCount(slot) > 0 then

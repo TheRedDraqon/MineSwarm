@@ -10,6 +10,7 @@ local function clipped(text, width)
 end
 
 function M.new(monitor, state, settings, actions)
+  settings.mode = settings.mode or "simple"
   local ui = {
     monitor = monitor,
     state = state,
@@ -69,7 +70,7 @@ function M.new(monitor, state, settings, actions)
   local function drawOverview(width, height)
     local job = ui.state.job
     line(1, 3, width, "MINE SWARM C2  |  "
-      .. (job and ("JOB " .. job.id .. " " .. tostring(job.status)) or "NO ACTIVE JOB"),
+      .. string.upper(ui.settings.mode or "simple") .. " MODE",
       colors.cyan)
     local online, mining = 0, 0
     for _, drone in pairs(ui.state.drones) do
@@ -80,7 +81,35 @@ function M.new(monitor, state, settings, actions)
     end
     line(1, 4, width, string.format("ONLINE %d   MINING %d   WAYPOINTS %d",
       online, mining, #ui.state.waypoints))
-    if job then
+    if ui.settings.mode == "simple" then
+      local ids = util.sortedKeys(ui.state.quarries or {})
+      if job then
+        line(2, 5, width - 2, "COMPLEX JOB " .. tostring(job.id) .. "  " .. tostring(job.status))
+      end
+      line(2, 6, width - 2, "SIMPLE QUARRIES  (GPS positions and unbreakable ores are live)")
+      local row = 7
+      for i = #ids, 1, -1 do
+        if row >= height - 5 then break end
+        local quarry = ui.state.quarries[ids[i]]
+        line(2, row, width - 2, string.format(
+          "%s %s  %s  %dx%d Y%d..%d  %d/%d  %s",
+          quarry.id, tostring(quarry.status), tostring(quarry.label),
+          quarry.bounds.x2 - quarry.bounds.x1 + 1,
+          quarry.bounds.z2 - quarry.bounds.z1 + 1,
+          quarry.bounds.y1, quarry.bounds.y2, quarry.progress or 0,
+          quarry.total or 0, tostring(quarry.preset)))
+        row = row + 1
+      end
+      if row == 7 then line(2, row, width - 2, "Choose an ore and a drone in JOB SETUP.") end
+    elseif job then
+      local activeQuarries = 0
+      for _, quarry in pairs(ui.state.quarries or {}) do
+        if quarry.status ~= "COMPLETE" and quarry.status ~= "ERROR"
+          and quarry.status ~= "INCOMPLETE" then
+          activeQuarries = activeQuarries + 1
+        end
+      end
+      line(1, 6, width, "ACTIVE SIMPLE QUARRIES " .. activeQuarries)
       local progress = job.progress or 0
       local total = job.total or 1
       local eta = "--"
@@ -137,14 +166,22 @@ function M.new(monitor, state, settings, actions)
           end
         end
       end
-    else
+    elseif not job then
       line(2, 7, width - 2, "Configure an ore range or layer and launch a job.")
     end
     local y = height - 4
-    button(1, y, math.floor(width / 4), "PAUSE ALL", function() actions.command("ALL", "PAUSE") end, colors.orange)
-    button(math.floor(width / 4) + 1, y, math.floor(width / 4), "RESUME ALL", function() actions.command("ALL", "RESUME") end, colors.green)
-    button(math.floor(width / 2) + 1, y, math.floor(width / 4), "RECALL ALL", function() actions.command("ALL", "RECALL") end, colors.red)
-    button(math.floor(3 * width / 4) + 1, y, width - math.floor(3 * width / 4), "DEPLOY +1", actions.deploy, colors.blue)
+    if ui.settings.mode == "simple" then
+      local buttonWidth = math.floor(width / 3)
+      button(1, y, buttonWidth, "PAUSE ALL", function() actions.command("ALL", "PAUSE") end, colors.orange)
+      button(buttonWidth + 1, y, buttonWidth, "RESUME ALL", function() actions.command("ALL", "RESUME") end, colors.green)
+      button(2 * buttonWidth + 1, y, width - 2 * buttonWidth, "RECALL ALL",
+        function() actions.command("ALL", "RECALL") end, colors.red)
+    else
+      button(1, y, math.floor(width / 4), "PAUSE ALL", function() actions.command("ALL", "PAUSE") end, colors.orange)
+      button(math.floor(width / 4) + 1, y, math.floor(width / 4), "RESUME ALL", function() actions.command("ALL", "RESUME") end, colors.green)
+      button(math.floor(width / 2) + 1, y, math.floor(width / 4), "RECALL ALL", function() actions.command("ALL", "RECALL") end, colors.red)
+      button(math.floor(3 * width / 4) + 1, y, width - math.floor(3 * width / 4), "DEPLOY +1", actions.deploy, colors.blue)
+    end
     line(1, height, width, ui.message, colors.yellow)
   end
 
@@ -163,16 +200,49 @@ function M.new(monitor, state, settings, actions)
         for i, name in ipairs(names) do if name == ui.selectedPreset then index = i end end
         ui.selectedPreset = names[index % #names + 1]
       end, colors.gray)
-    local origin = ui.settings.origin or ui.settings.home
-    local originText = "not configured"
-    if type(origin) == "table" and origin.x ~= nil and origin.z ~= nil then
-      originText = tostring(origin.x) .. ", " .. tostring(origin.z)
-    end
-    line(2, 7, width - 4, "X/Z origin: " .. originText .. "  (set in master_config)")
-    if ui.settings.configured then
-      line(2, 8, width - 4, "Tap a value to type an exact number on the computer keyboard.")
+    if ui.settings.mode == "simple" then
+      line(2, 6, width - 4, "One idle drone is assigned to each quarry.")
+      local labels = {}
+      for label, drone in pairs(ui.state.drones) do
+        if drone.online and (drone.state == "IDLE" or drone.state == "COMPLETE")
+          and type(drone.home) == "table" then
+          labels[#labels + 1] = label
+        end
+      end
+      table.sort(labels)
+      if #labels > 0 then
+        local selectedIndex = 0
+        for i, label in ipairs(labels) do
+          if label == ui.selectedDrone then selectedIndex = i end
+        end
+        if selectedIndex == 0 then selectedIndex = 1; ui.selectedDrone = labels[1] end
+        local selectedLabel = labels[selectedIndex]
+        local selectedDrone = ui.state.drones[selectedLabel]
+        button(2, 7, width - 4, "DRONE: " .. selectedLabel .. "  (tap to change)", function()
+          ui.selectedDrone = labels[selectedIndex % #labels + 1]
+        end, colors.blue)
+        line(2, 8, width - 4, string.format("Home %d,%d,%d facing %d; deposit is behind it.",
+          selectedDrone.home.x, selectedDrone.home.y, selectedDrone.home.z, selectedDrone.home.dir))
+        line(2, 9, width - 4, string.format("Quarry begins one block ahead at %d,%d.",
+          selectedDrone.home.x + ({ [0] = 0, [1] = 1, [2] = 0, [3] = -1 })[selectedDrone.home.dir],
+          selectedDrone.home.z + ({ [0] = -1, [1] = 0, [2] = 1, [3] = 0 })[selectedDrone.home.dir]))
+      else
+        ui.selectedDrone = nil
+        line(2, 7, width - 4, "No online idle drone has reported a GPS home.", colors.yellow)
+        line(2, 8, width - 4, "Start a turtle at its parking position, facing the quarry.")
+      end
     else
-      line(2, 8, width - 4, "FOB not configured: press C, then enter FOB and quarry coordinates.", colors.yellow)
+      local origin = ui.settings.origin or ui.settings.home
+      local originText = "not configured"
+      if type(origin) == "table" and origin.x ~= nil and origin.z ~= nil then
+        originText = tostring(origin.x) .. ", " .. tostring(origin.z)
+      end
+      line(2, 7, width - 4, "X/Z origin: " .. originText .. "  (set in master_config)")
+      if ui.settings.configured then
+        line(2, 8, width - 4, "Tap a value to type an exact number on the computer keyboard.")
+      else
+        line(2, 8, width - 4, "FOB not configured: press C, then enter FOB and quarry coordinates.", colors.yellow)
+      end
     end
     button(2, 10, 10, "-16 WIDTH", function() ui.width = math.max(1, ui.width - 16) end)
     button(13, 10, 10, "+16 WIDTH", function() ui.width = ui.width + 16 end)
@@ -203,7 +273,9 @@ function M.new(monitor, state, settings, actions)
       line(2, 16, width - 4, "Tap a dimension value to type its exact amount on the computer.")
     end
     button(2, math.max(17, height - 4), width - 3, "LAUNCH SWARM JOB",
-      function() actions.launch(ui.mode, ui.selectedPreset, ui.width, ui.length, ui.depth) end, colors.green)
+      function()
+        actions.launch(ui.mode, ui.selectedPreset, ui.width, ui.length, ui.depth, ui.selectedDrone)
+      end, colors.green)
     line(2, height, width - 2, ui.message, colors.yellow)
   end
 
@@ -273,7 +345,8 @@ function M.new(monitor, state, settings, actions)
     monitor.setBackgroundColor(colors.black)
     monitor.clear()
     tabBar(width)
-    line(1, 2, width, "Q quits to shell  |  C edits FOB and deployer settings", colors.gray)
+    line(1, 2, width, "Q quits  |  M switches " .. string.upper(ui.settings.mode or "simple")
+      .. " mode  |  C edits config", colors.gray)
     if ui.tab == 1 then drawOverview(width, height)
     elseif ui.tab == 2 then drawSetup(width, height)
     elseif ui.tab == 3 then drawDrones(width, height)

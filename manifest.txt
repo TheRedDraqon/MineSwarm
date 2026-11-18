@@ -1,4 +1,4 @@
-version=1.0.1
+version=1.1.0
 
 [common]
 update.lua
@@ -11,6 +11,7 @@ shared/state.lua
 shared/pose.lua
 master/ore_db.lua
 master/partition.lua
+master/quarries.lua
 master/ui.lua
 master/config_editor.lua
 master/main.lua

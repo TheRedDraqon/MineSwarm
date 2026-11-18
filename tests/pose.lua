@@ -110,7 +110,11 @@ direction = pose.dir
 blockedDown = { y = pose.y - 1, data = { name = "allthemodium:allthemodium_ore" } }
 local alerted, alertReason = poseLib.moveTo(pose, pose.x, pose.y - 1, pose.z,
   function(block, target) alerts[#alerts + 1] = { block = block, pos = target } end)
-assert(not alerted and alertReason == "protected block")
+assert(not alerted and alertReason:find("protected block", 1, true))
+assert(alertReason:find("allthemodium:allthemodium_ore", 1, true))
+local blockedCoordinate = pose.x .. "," .. blockedDown.y .. "," .. pose.z
+assert(alertReason:find(blockedCoordinate, 1, true),
+  "movement errors should include the blocked coordinates")
 assert(#alerts == 1 and alerts[1].pos.y == blockedDown.y)
 assert(position.y == pose.y)
 

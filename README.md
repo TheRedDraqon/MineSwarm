@@ -1,15 +1,24 @@
 # MineSwarm for CC:Tweaked / ATM9
 
-MineSwarm is a Lua swarm controller for CC:Tweaked. It contains a touchscreen
-master, a forward-base deployer, mining turtles, and GPS-host setup. The project
-uses the ore ranges from `PROJECT.md`; verify those ranges against the exact ATM9
-server version before starting a large job.
+MineSwarm is a Lua mining controller for CC:Tweaked, with a touchscreen master,
+mining turtles, GPS positioning, and an optional forward-base deployer. The
+master has two modes: **Simple** (default), for directly assigning individual
+turtles to independent quarries, and **Complex**, which retains deployer and
+subdivision workflows. The project uses the ore ranges from `PROJECT.md`;
+verify those ranges against the exact ATM9 server version before starting a
+large job.
 
 ## What it does
 
-- The master discovers labeled turtles by heartbeat, persists its registry,
-  active job, yields, and unbreakable-block waypoints, and hosts four monitor
+- The master discovers labeled turtles by heartbeat, persists GPS positions,
+  active work, yields, and unbreakable-block waypoints, and hosts four monitor
   tabs: overview, job setup, drone inspector, and ledger.
+- **Simple mode** assigns one chosen idle turtle to each quarry, allows multiple
+  non-intersecting quarries to run concurrently, and does not require a FOB
+  configuration or deployer. The turtle's boot position is its deposit/home;
+  it starts facing the quarry, with the deposit immediately behind it.
+- **Complex mode** retains the FOB configuration, deployment controls, and
+  balanced swarm subdivision of one requested area.
 - Jobs use inclusive X/Z bounds and the selected inclusive Y range. Osmium is
   Y=-21 through -1 (21 levels). A job's N available turtles receive a balanced
   rectangular tiling of the **entire** requested X/Z area.
@@ -100,11 +109,13 @@ initial label/GPS coordinates. Existing installations must run the updated
 installer once to install the updater-enabled `startup.lua`; after that,
 ordinary version updates require no role or label prompts.
 
-On the master, edit `/mineswarm/master_config` before launching a job:
+Only **Complex mode** requires a configured FOB. Press **C** on the master or
+edit `/mineswarm/master_config` before launching a Complex job:
 
 ```lua
 {
   configured = true,
+  mode = "complex",
   home = { x = 0, y = 80, z = 0, dir = 0 },
   origin = { x = 0, z = 0 },
   deployerLabel = "Deployer"
@@ -121,34 +132,64 @@ and deployment is downward.
 
 ## Running jobs
 
+Press **M** on the master computer terminal to switch between **Simple** and
+**Complex**. The mode is saved in `/mineswarm/master_config`; new installations
+start in Simple mode.
+
+### Simple mode
+
+1. Park each turtle at its own deposit/refuel position, facing toward the area
+   it will mine. Start/reboot MineSwarm there so the turtle reports its GPS home
+   and direction. Put the deposit inventory directly behind the turtle.
+2. On **JOB SETUP**, choose `ORE` or `LAYER`, select the target, set
+   width/length and (for layers) depth, then select an online idle turtle.
+   The job begins one block in front of that turtle. Width extends toward
+   positive X and length toward positive Z; the deposit/home position is not
+   included in the quarry.
+3. Launch. The master rejects a quarry if its inclusive X/Y/Z bounds intersect
+   another active Simple quarry or Complex job. Distinct turtles may run
+   multiple non-overlapping quarries at once. A turtle already assigned to
+   active work cannot be selected again.
+4. The turtle returns to its saved home and unloads toward the deposit behind
+   it. **OVERVIEW** lists quarry state/progress; **DRONES** shows each turtle's
+   label, live GPS position, facing, and state. **LEDGER** shows unbreakable
+   ore waypoints and deposited yield. Clearing a waypoint removes only its
+   ledger entry.
+
+Simple mode does not need `configured=true`, a configured FOB/origin, a
+deployer, or subdivisions. It still needs working GPS, a modem, mining and
+fuel upgrades, and a deposit directly behind each turtle's saved home.
+
+### Complex mode
+
 1. Press **C** on the master computer to open the configuration editor. Enter
    the FOB miner parking X/Y/Z, its facing (`0=north, 1=east, 2=south, 3=west`),
-   the quarry origin X/Z, and the deployer computer label. Press Enter to keep
-   any displayed value. Saving marks the master configured.
+   the quarry origin X/Z, and the deployer computer label. Saving marks the
+   master configured. The FOB drop-off/refuel inventory must be in front of
+   that configured home.
 2. Confirm online labeled turtles on the **DRONES** tab.
 3. On **JOB SETUP**, choose `ORE` or `LAYER`, select a range, set width/length
-   and (for layers) depth, then launch. Tap a dimension value to select it; the
-   field highlights, and you can type an exact positive integer on the master
+   and (for layers) depth, then launch. Available turtles are divided over
+   the requested area. Tap a dimension value to select it; the field
+   highlights, and you can type an exact positive integer on the master
    keyboard and press Enter. Ore mode always uses the database's inclusive
    sweet range. Layer depth starts at the preset's maximum Y and extends
    downward, bounded by that layer's minimum.
 4. The origin is the configured quarry X/Z. Width extends toward positive X and
    length toward positive Z.
-5. Use **OVERVIEW** for status and **LEDGER** for waypoints and deposited yield.
-   Clearing a waypoint removes only its ledger entry; it does not mine or
-   otherwise change the world.
+5. Use **OVERVIEW** for status and **LEDGER** for waypoints and deposited
+   yield.
 
 Press **Q** on the master computer to exit the C2 program and return to the
 shell. This does not pause or recall turtles; use the monitor controls first if
 the swarm should stop.
 
-The master uses all online idle/complete turtles available at launch. A turtle
-in `ERROR` is deliberately not reused until its fault is investigated.
-The number of turtles cannot exceed the number of X/Z cells. It marks a turtle
-offline after 20 seconds without a heartbeat. To avoid assigning a sector while
-a slow or disconnected turtle may still be mining it, the current version does
-**not** automatically reassign an offline turtle's sector. Inspect the turtle
-and its sector before manually recovering or restarting that job.
+Complex mode uses online idle/complete turtles available at launch. A turtle
+in `ERROR` is deliberately not reused until its fault is investigated. The
+number of turtles cannot exceed the number of X/Z cells. Both modes mark a
+turtle offline after 20 seconds without a heartbeat and do **not** automatically
+reassign its area; inspect it before manually recovering or restarting work.
+Simple overlap checks use inclusive 3D bounds and apply to active quarries/jobs.
 
 ## Safety and current boundaries
 
@@ -162,7 +203,10 @@ and its sector before manually recovering or restarting that job.
   cleared to enter and move between columns, so the mined access space can
   extend one layer above the selected ore range.
 - If a blocked movement prevents reaching a sector, the task stops and reports
-  an error rather than claiming completion.
+  an error rather than claiming completion. Movement errors include the block
+  name and destination coordinates when the turtle can inspect the obstruction.
+  A waypoint such as deepslate may indicate an undiggable path block; it does
+  not by itself prove FTB Chunks claim protection.
 - The drop-off chest must be directly in front of the configured home position.
   The miner checks that drops succeeded and only reports a yield after unloading.
 - Fuel reservation is estimated conservatively from transit altitude, sector
@@ -183,7 +227,7 @@ Run the host-side tests from this directory with Lua 5.2+:
 
 ```sh
 lua tests/partition.lua && lua tests/pose.lua && lua tests/ui.lua \
-  && lua tests/update.lua && lua tests/config_editor.lua
+  && lua tests/update.lua && lua tests/config_editor.lua && lua tests/quarries.lua
 ```
 
 For syntax validation, run `luac -p` on each Lua file. CC:Tweaked in-world

@@ -2,7 +2,8 @@ local roles = {
   master = {
     "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",
     "shared/pose.lua", "master/ore_db.lua", "master/partition.lua",
-    "master/ui.lua", "master/config_editor.lua", "master/main.lua", "update.lua",
+    "master/quarries.lua", "master/ui.lua", "master/config_editor.lua",
+    "master/main.lua", "update.lua",
   },
   deployer = {
     "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",
@@ -76,8 +77,7 @@ end
 if role == "master" and not fs.exists("/mineswarm/master_config") then
   writeFile("/mineswarm/master_config", textutils.serialize({
     configured = false,
-    home = { x = 0, y = 0, z = 0, dir = 0 },
-    origin = { x = 0, z = 0 },
+    mode = "simple",
     deployerLabel = "Deployer",
   }))
 elseif role == "deployer" and not fs.exists("/mineswarm/deployer_config") then
@@ -103,7 +103,7 @@ end
 
 print("Installed MineSwarm role: " .. role)
 if role == "master" then
-  print("Edit /mineswarm/master_config and set configured=true plus the FOB home coordinates before launching jobs.")
+  print("Simple mode is ready by default. Press M to switch to Complex mode.")
 end
 print("Rebooting in 3 seconds...")
 sleep(3)
