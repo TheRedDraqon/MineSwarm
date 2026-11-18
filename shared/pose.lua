@@ -25,27 +25,44 @@ function M.calibrate()
   local origin, reason = M.locate()
   if not origin then return nil, reason end
 
-  local function sample()
-    if not turtle.forward() then return nil end
-    local moved = M.locate()
-    if not turtle.back() then return nil end
-    return moved
+  local failures = {}
+  for offset = 0, 3 do
+    local blocked, block = turtle.inspect()
+    if blocked then
+      failures[#failures + 1] = "blocked by " .. tostring(block and block.name or "unknown block")
+    elseif not turtle.forward() then
+      failures[#failures + 1] = "forward movement failed"
+    else
+      local moved
+      for attempt = 1, 3 do
+        moved = M.locate()
+        if moved then break end
+        os.sleep(0.5)
+      end
+      if not turtle.back() then
+        return nil, "Calibration moved the turtle but it could not back up; recover its position manually"
+      end
+      if moved then
+        local direction = deriveDirection(moved.x - origin.x, moved.z - origin.z)
+        if direction and moved.y == origin.y then
+          for _ = 1, offset do turtle.turnLeft() end
+          return {
+            x = origin.x,
+            y = origin.y,
+            z = origin.z,
+            dir = (direction - offset) % 4,
+          }
+        end
+        failures[#failures + 1] = "GPS did not report a one-block horizontal move"
+      else
+        failures[#failures + 1] = "GPS could not locate the turtle after it moved"
+      end
+    end
+    turtle.turnRight()
   end
 
-  local moved = sample()
-  if moved then
-    local direction = deriveDirection(moved.x - origin.x, moved.z - origin.z)
-    if direction then return { x = origin.x, y = origin.y, z = origin.z, dir = direction } end
-  end
-
-  turtle.turnRight()
-  moved = sample()
-  turtle.turnLeft()
-  if moved then
-    local direction = deriveDirection(moved.x - origin.x, moved.z - origin.z)
-    if direction then return { x = origin.x, y = origin.y, z = origin.z, dir = (direction + 3) % 4 } end
-  end
-  return nil, "Unable to determine facing; clear an adjacent block and retry calibration"
+  return nil, "Unable to determine facing (" .. table.concat(failures, "; ")
+    .. "); verify GPS coverage and clear at least one adjacent block"
 end
 
 function M.turnTo(pose, direction)

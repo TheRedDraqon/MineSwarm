@@ -5,6 +5,7 @@ end
 local position = { x = 0, y = 64, z = 0 }
 local direction = 0
 local blockedDown
+local blockedForward = {}
 local alerts = {}
 local vectors = {
   [0] = { x = 0, z = -1 },
@@ -17,8 +18,14 @@ turtle = {
   turnLeft = function() direction = (direction + 3) % 4; return true end,
   turnRight = function() direction = (direction + 1) % 4; return true end,
   forward = function()
+    if blockedForward[direction] then return false end
     local delta = vectors[direction]
     position.x, position.z = position.x + delta.x, position.z + delta.z
+    return true
+  end,
+  back = function()
+    local delta = vectors[direction]
+    position.x, position.z = position.x - delta.x, position.z - delta.z
     return true
   end,
   up = function() position.y = position.y + 1; return true end,
@@ -36,9 +43,17 @@ turtle = {
   inspectUp = function() return false end,
   digUp = function() return false end,
   detectUp = function() return false end,
-  inspect = function() return false end,
+  inspect = function()
+    if blockedForward[direction] then return true, { name = "minecraft:stone" } end
+    return false
+  end,
   dig = function() return false end,
   detect = function() return false end,
+}
+gps = {
+  locate = function()
+    return position.x, position.y, position.z
+  end,
 }
 os.sleep = function() end
 
@@ -50,6 +65,21 @@ assert(pose.x == 3 and pose.y == 62 and pose.z == 2)
 assert(position.x == pose.x and position.y == pose.y and position.z == pose.z)
 assert(direction == pose.dir)
 
+position = { x = 0, y = 64, z = 0 }
+direction = 0
+blockedForward[0] = true
+local calibrated, calibrationReason = poseLib.calibrate()
+assert(calibrated, calibrationReason)
+assert(calibrated.dir == 0)
+assert(position.x == 0 and position.y == 64 and position.z == 0)
+assert(direction == 0, "calibration must restore the original turtle facing")
+blockedForward = { [0] = true, [1] = true, [2] = true, [3] = true }
+local failedCalibration, facingReason = poseLib.calibrate()
+assert(failedCalibration == nil and facingReason:find("blocked by", 1, true))
+blockedForward = {}
+
+position = { x = pose.x, y = pose.y, z = pose.z }
+direction = pose.dir
 blockedDown = { y = pose.y - 1, data = { name = "allthemodium:allthemodium_ore" } }
 local alerted, alertReason = poseLib.moveTo(pose, pose.x, pose.y - 1, pose.z,
   function(block, target) alerts[#alerts + 1] = { block = block, pos = target } end)

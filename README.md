@@ -55,8 +55,9 @@ overlaps or leaves unassigned X/Z coordinates.
    slots. Install the `drone` role on each turtle before powering it down and
    storing it as an item; otherwise the deployer will boot it without the
    MineSwarm startup program. A miner calibrates its facing by moving one block
-   into open space and backing up; clear at least one adjacent direction before
-   booting it.
+   into open space and backing up; calibration checks all four directions, so
+   at least one adjacent block must be clear. Verify GPS works at the turtle's
+   location if calibration still fails.
 5. Use one dedicated modem channel. The default is `9001`; every node must use
    the same channel and protocol. Restrict access to that modem network: packets
    are not cryptographically authenticated.
