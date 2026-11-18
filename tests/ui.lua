@@ -1,7 +1,7 @@
-package.preload["mineswarm.shared.util"] = function()
+package.preload["shared.util"] = function()
   return dofile("shared/util.lua")
 end
-package.preload["mineswarm.master.ore_db"] = function()
+package.preload["master.ore_db"] = function()
   return dofile("master/ore_db.lua")
 end
 

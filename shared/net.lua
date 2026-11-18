@@ -1,5 +1,5 @@
-local config = require("mineswarm.shared.config")
-local util = require("mineswarm.shared.util")
+local config = require("shared.config")
+local util = require("shared.util")
 
 local M = {}
 local modem

@@ -1,7 +1,9 @@
-local config = require("mineswarm.shared.config")
-local util = require("mineswarm.shared.util")
-local net = require("mineswarm.shared.net")
-local stateLib = require("mineswarm.shared.state")
+package.path = "/mineswarm/?.lua;/mineswarm/?/init.lua;" .. package.path
+
+local config = require("shared.config")
+local util = require("shared.util")
+local net = require("shared.net")
+local stateLib = require("shared.state")
 
 local configPath = "/mineswarm/deployer_config"
 local settings = stateLib.load(configPath, {

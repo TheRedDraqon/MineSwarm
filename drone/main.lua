@@ -1,9 +1,11 @@
-local config = require("mineswarm.shared.config")
-local util = require("mineswarm.shared.util")
-local net = require("mineswarm.shared.net")
-local stateLib = require("mineswarm.shared.state")
-local poseLib = require("mineswarm.shared.pose")
-local miner = require("mineswarm.drone.miner")
+package.path = "/mineswarm/?.lua;/mineswarm/?/init.lua;" .. package.path
+
+local config = require("shared.config")
+local util = require("shared.util")
+local net = require("shared.net")
+local stateLib = require("shared.state")
+local poseLib = require("shared.pose")
+local miner = require("drone.miner")
 
 local dataPath = "/mineswarm/drone_state"
 local state = stateLib.load(dataPath, {

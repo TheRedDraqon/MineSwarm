@@ -1,6 +1,6 @@
-local poseLib = require("mineswarm.shared.pose")
-local util = require("mineswarm.shared.util")
-local config = require("mineswarm.shared.config")
+local poseLib = require("shared.pose")
+local util = require("shared.util")
+local config = require("shared.config")
 
 local M = {}
 

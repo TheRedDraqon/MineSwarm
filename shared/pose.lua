@@ -1,4 +1,4 @@
-local config = require("mineswarm.shared.config")
+local config = require("shared.config")
 local M = {}
 
 local delta = {

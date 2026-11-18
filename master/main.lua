@@ -1,10 +1,12 @@
-local config = require("mineswarm.shared.config")
-local util = require("mineswarm.shared.util")
-local net = require("mineswarm.shared.net")
-local stateLib = require("mineswarm.shared.state")
-local oreDb = require("mineswarm.master.ore_db")
-local partition = require("mineswarm.master.partition")
-local uiLib = require("mineswarm.master.ui")
+package.path = "/mineswarm/?.lua;/mineswarm/?/init.lua;" .. package.path
+
+local config = require("shared.config")
+local util = require("shared.util")
+local net = require("shared.net")
+local stateLib = require("shared.state")
+local oreDb = require("master.ore_db")
+local partition = require("master.partition")
+local uiLib = require("master.ui")
 
 local dataPath = config.stateFile
 local state = stateLib.load(dataPath, {

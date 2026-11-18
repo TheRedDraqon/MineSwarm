@@ -1,5 +1,5 @@
-local util = require("mineswarm.shared.util")
-local oreDb = require("mineswarm.master.ore_db")
+local util = require("shared.util")
+local oreDb = require("master.ore_db")
 
 local M = {}
 

@@ -1,4 +1,4 @@
-package.preload["mineswarm.shared.config"] = function()
+package.preload["shared.config"] = function()
   return { gpsTimeout = 2, maxTravelSteps = 1000 }
 end
 
