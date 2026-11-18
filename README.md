@@ -63,17 +63,19 @@ overlaps or leaves unassigned X/Z coordinates.
 
 ## Installing
 
-The installer expects the project files to be available over HTTP, such as from
-a trusted GitHub raw URL. Enable CC:Tweaked HTTP in the server configuration.
-On each computer, download this project's `installer.lua` and run it:
+Enable CC:Tweaked HTTP in the server configuration. On each computer, download
+the installer from this repository and run it:
 
 ```text
-wget https://raw.githubusercontent.com/OWNER/REPOSITORY/BRANCH/MineSwarm/installer.lua installer.lua
+wget https://raw.githubusercontent.com/TheRedDraqon/MineSwarm/refs/heads/master/installer.lua installer.lua
 installer
 ```
 
-Replace the URL with the actual location. Enter the matching base URL ending in
-`/MineSwarm`, then select one role:
+The installer defaults to
+`https://raw.githubusercontent.com/TheRedDraqon/MineSwarm/refs/heads/master`
+and downloads the role-specific files from that same base URL. Press Enter to
+accept it, or enter another raw base URL to install from a different branch or
+fork. Then select one role:
 
 - `master` on the C2 computer
 - `deployer` on the forward-base turtle
