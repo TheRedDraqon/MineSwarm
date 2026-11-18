@@ -6,7 +6,10 @@ local position = { x = 0, y = 64, z = 0 }
 local direction = 0
 local blockedDown
 local blockedForward = {}
+local blockNames = {}
+local dugDirections = {}
 local alerts = {}
+local gpsStale = false
 local vectors = {
   [0] = { x = 0, z = -1 },
   [1] = { x = 1, z = 0 },
@@ -44,14 +47,22 @@ turtle = {
   digUp = function() return false end,
   detectUp = function() return false end,
   inspect = function()
-    if blockedForward[direction] then return true, { name = "minecraft:stone" } end
+    if blockedForward[direction] then
+      return true, { name = blockNames[direction] or "minecraft:stone" }
+    end
     return false
   end,
-  dig = function() return false end,
+  dig = function()
+    if not blockedForward[direction] then return false end
+    dugDirections[#dugDirections + 1] = direction
+    blockedForward[direction] = nil
+    return true
+  end,
   detect = function() return false end,
 }
 gps = {
   locate = function()
+    if gpsStale then return 0, 64, 0 end
     return position.x, position.y, position.z
   end,
 }
@@ -74,9 +85,25 @@ assert(calibrated.dir == 0)
 assert(position.x == 0 and position.y == 64 and position.z == 0)
 assert(direction == 0, "calibration must restore the original turtle facing")
 blockedForward = { [0] = true, [1] = true, [2] = true, [3] = true }
-local failedCalibration, facingReason = poseLib.calibrate()
-assert(failedCalibration == nil and facingReason:find("blocked by", 1, true))
+local fallbackCalibration, fallbackReason = poseLib.calibrate()
+assert(fallbackCalibration, fallbackReason)
+assert(fallbackCalibration.dir == 0)
+assert(position.x == 0 and position.y == 64 and position.z == 0)
+assert(direction == 0, "dig fallback must restore the original turtle facing")
+assert(#dugDirections == 1 and dugDirections[1] == 0, "fallback should dig only the front block")
+
+blockedForward = { [0] = true, [1] = true, [2] = true, [3] = true }
+blockNames[0] = "allthemodium:allthemodium_ore"
+local protectedCalibration, protectedReason = poseLib.calibrate()
+assert(protectedCalibration == nil and protectedReason:find("protected block", 1, true))
+assert(#dugDirections == 1, "calibration must not dig protected blocks")
+blockNames[0] = nil
 blockedForward = {}
+gpsStale = true
+local staleCalibration, staleReason = poseLib.calibrate()
+assert(staleCalibration == nil and staleReason:find("GPS", 1, true))
+assert(#dugDirections == 1, "calibration must not dig when GPS readings are stale")
+gpsStale = false
 
 position = { x = pose.x, y = pose.y, z = pose.z }
 direction = pose.dir

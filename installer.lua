@@ -2,17 +2,17 @@ local roles = {
   master = {
     "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",
     "shared/pose.lua", "master/ore_db.lua", "master/partition.lua",
-    "master/ui.lua", "master/main.lua",
+    "master/ui.lua", "master/main.lua", "update.lua",
   },
   deployer = {
     "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",
-    "shared/pose.lua", "deployer/main.lua",
+    "shared/pose.lua", "deployer/main.lua", "update.lua",
   },
   drone = {
     "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",
-    "shared/pose.lua", "drone/miner.lua", "drone/main.lua",
+    "shared/pose.lua", "drone/miner.lua", "drone/main.lua", "update.lua",
   },
-  gps = { "satellite/main.lua" },
+  gps = { "satellite/main.lua", "update.lua" },
 }
 
 local function prompt(text, default)
@@ -89,16 +89,16 @@ elseif role == "deployer" and not fs.exists("/mineswarm/deployer_config") then
 end
 
 if role == "master" then
-  writeFile("/startup.lua", 'shell.run("mineswarm/master/main.lua")\n')
+  writeFile("/startup.lua", 'shell.run("mineswarm/update.lua", "master")\nshell.run("mineswarm/master/main.lua")\n')
 elseif role == "deployer" then
   if label and label ~= "" then os.setComputerLabel(label) end
-  writeFile("/startup.lua", 'shell.run("mineswarm/deployer/main.lua")\n')
+  writeFile("/startup.lua", 'shell.run("mineswarm/update.lua", "deployer")\nshell.run("mineswarm/deployer/main.lua")\n')
 elseif role == "drone" then
   if label and label ~= "" then os.setComputerLabel(label) end
-  writeFile("/startup.lua", 'shell.run("mineswarm/drone/main.lua")\n')
+  writeFile("/startup.lua", 'shell.run("mineswarm/update.lua", "drone")\nshell.run("mineswarm/drone/main.lua")\n')
 else
   writeFile("/mineswarm/gps_config", textutils.serialize(gpsPosition))
-  writeFile("/startup.lua", 'shell.run("mineswarm/satellite/main.lua")\n')
+  writeFile("/startup.lua", 'shell.run("mineswarm/update.lua", "gps")\nshell.run("mineswarm/satellite/main.lua")\n')
 end
 
 print("Installed MineSwarm role: " .. role)

@@ -54,10 +54,11 @@ overlaps or leaves unassigned X/Z coordinates.
    mining upgrade, modem, sufficient initial fuel, and enough free inventory
    slots. Install the `drone` role on each turtle before powering it down and
    storing it as an item; otherwise the deployer will boot it without the
-   MineSwarm startup program. A miner calibrates its facing by moving one block
-   into open space and backing up; calibration checks all four directions, so
-   at least one adjacent block must be clear. Verify GPS works at the turtle's
-   location if calibration still fails.
+   MineSwarm startup program. Calibration checks all four directions for an
+   opening and compares GPS readings before and after a one-block move. If
+   fully enclosed, it digs only the block directly in front (never a protected
+   block) to make a test opening, then backs up. Verify GPS works at the
+   turtle's location if calibration still fails.
 5. Use one dedicated modem channel. The default is `9001`; every node must use
    the same channel and protocol. Restrict access to that modem network: packets
    are not cryptographically authenticated.
@@ -84,6 +85,21 @@ fork. Then select one role:
 - `gps` on each GPS host; enter that computer's actual coordinates
 
 The installer installs the matching files, configures startup, and reboots.
+On every subsequent startup, MineSwarm fetches `manifest.txt`. If its semantic
+version is higher than `/mineswarm/version`, the updater downloads the files for
+that computer's role, stages them, and updates the local version. It does not
+ask for a role or label, and does not replace configuration, swarm state, or
+GPS coordinates. When GitHub is unavailable or a download fails, it reports
+the error and continues with installed files. Updates are checked at startup,
+not while a program is running.
+
+To publish an update, increment `version=` in `manifest.txt`, update the file
+lists there when needed, and push the changed files to the configured branch.
+The first install still uses `installer.lua` to select the role and set any
+initial label/GPS coordinates. Existing installations must run the updated
+installer once to install the updater-enabled `startup.lua`; after that,
+ordinary version updates require no role or label prompts.
+
 On the master, edit `/mineswarm/master_config` before launching a job:
 
 ```lua
@@ -156,7 +172,7 @@ and its sector before manually recovering or restarting that job.
 Run the host-side tests from this directory with Lua 5.2+:
 
 ```sh
-lua tests/partition.lua && lua tests/pose.lua && lua tests/ui.lua
+lua tests/partition.lua && lua tests/pose.lua && lua tests/ui.lua && lua tests/update.lua
 ```
 
 For syntax validation, run `luac -p` on each Lua file. CC:Tweaked in-world
