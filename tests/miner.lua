@@ -7,15 +7,14 @@ local function key(x, y, z) return x .. "," .. y .. "," .. z end
 
 package.preload["shared.util"] = function() return dofile("shared/util.lua") end
 package.preload["shared.pose"] = function()
-  return {
-    isProtected = function(block) return block.name == "allthemodium:ore" end,
-    turnTo = function(current, direction) current.dir = direction end,
-    moveTo = function(current, x, y, z, alert, _, tick)
-      current.x, current.y, current.z = x, y, z
-      if tick then tick(current) end
-      return true
-    end,
-  }
+  local lib = dofile("shared/pose.lua")
+  lib.turnTo = function(current, direction) current.dir = direction end
+  lib.moveTo = function(current, x, y, z, alert, _, tick)
+    current.x, current.y, current.z = x, y, z
+    if tick then tick(current) end
+    return true
+  end
+  return lib
 end
 turtle = {
   getFuelLevel = function() return "unlimited" end,
@@ -32,11 +31,15 @@ turtle = {
   end,
   inspectDown = function()
     local block = blocks[key(pose.x, pose.y - 1, pose.z)]
-    return block ~= nil, block and { name = block }
+    if type(block) == "string" then block = { name = block } end
+    return block ~= nil, block
   end,
+  detectDown = function() return blocks[key(pose.x, pose.y - 1, pose.z)] ~= nil end,
   digDown = function()
     local blockKey = key(pose.x, pose.y - 1, pose.z)
-    if not blocks[blockKey] then return false end
+    local block = blocks[blockKey]
+    if not block then return false, "Nothing to dig here" end
+    if type(block) == "table" and block.reason then return false, block.reason end
     blocks[blockKey] = nil
     dug = dug + 1
     if fillOnDig then
@@ -51,7 +54,7 @@ turtle = {
 local miner = dofile("drone/miner.lua")
 local function reset()
   pose = { x = 0, y = 0, z = 0, dir = 0 }
-  slots, selected, drops, dug, pauses, alerts = {}, 1, 0, 0, 0, 0
+  slots, selected, drops, dug, pauses, alerts = {}, 1, 0, 0, 0, {}
   blocks = {}
   fillOnDig = false
   chestPresent = true
@@ -61,7 +64,7 @@ local function callbacks()
     tick = function() end,
     setState = function() end,
     progress = function() end,
-    alert = function() alerts = alerts + 1 end,
+    alert = function(block, position) alerts[#alerts + 1] = { block = block, pos = position } end,
     waitForSpace = function()
       pauses = pauses + 1
       slots[1] = 0
@@ -99,9 +102,41 @@ assert(not ok and reason:find("Chest is missing", 1, true) and drops == 0,
   "missing chest must not cause items to be dropped on the ground")
 
 reset()
-blocks[key(0, -1, 0)] = "allthemodium:ore"
+blocks[key(0, -1, 0)] = { name = "minecraft:deepslate", tags = { ["allthemodium:paxel_effective"] = true } }
+ok, reason = miner.run(pose, task(false, -1, -1), callbacks(), 0)
+assert(ok, reason)
+assert(dug == 1 and #alerts == 0, "deepslate with Allthemodium tags must be mined")
+
+reset()
+blocks[key(0, -1, 0)] = { name = "allthemodium:allthemodium_ore" }
+ok, reason = miner.run(pose, task(false, -1, -1), callbacks(), 0)
+assert(ok, reason)
+assert(dug == 1 and #alerts == 0, "a successfully dug ore must not create a waypoint")
+
+reset()
+blocks[key(0, -1, 0)] = { name = "allthemodium:allthemodium_ore",
+  reason = "Cannot break unbreakable block" }
 ok, reason = miner.run(pose, task(false, -2, -1), callbacks(), 0)
 assert(ok, reason)
-assert(alerts == 1 and dug == 0, "protected ore must be reported and left intact")
+assert(#alerts == 1 and alerts[1].pos.y == -1 and dug == 0,
+  "unbreakable Allthemodium ore must be reported and left intact")
+
+reset()
+blocks[key(0, -1, 0)] = { name = "minecraft:bedrock", reason = "Cannot break unbreakable block" }
+ok, reason = miner.run(pose, task(false, -2, -1), callbacks(), 0)
+assert(ok, reason)
+assert(#alerts == 0 and dug == 0, "bedrock must be skipped without a waypoint")
+
+reset()
+blocks[key(0, -1, 0)] = { name = "minecraft:deepslate", reason = "Cannot break block" }
+ok, reason = miner.run(pose, task(false, -1, -1), callbacks(), 0)
+assert(not ok and reason:find("Cannot break block", 1, true) and #alerts == 0,
+  "other dig failures must be reported rather than silently skipped")
+
+reset()
+blocks[key(0, -1, 0)] = { name = "allthemodium:allthemodium_slate_ore", reason = "Cannot break block" }
+ok, reason = miner.run(pose, task(false, -1, -1), callbacks(), 0)
+assert(not ok and reason:find("Cannot break block", 1, true) and #alerts == 0,
+  "Allthemodium must only be waypointed for an unbreakable-block failure")
 
 print("MineSwarm mining and inventory tests passed")

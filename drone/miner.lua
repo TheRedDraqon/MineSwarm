@@ -88,15 +88,14 @@ function M.run(pose, task, callbacks, progress)
             if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < 1 then
               return false, "Out of fuel at " .. pose.x .. "," .. pose.y .. "," .. pose.z, index
             end
-            local found, block = turtle.inspectDown()
             local target = { x = pose.x, y = pose.y - 1, z = pose.z }
-            if found and poseLib.isProtected(block) then
-              callbacks.alert(block.name, target)
-              break
-            end
-            if found and not turtle.digDown() then
-              callbacks.alert(block.name or "unknown block", target)
-              break
+            if turtle.detectDown() then
+              local dug, digReason, unbreakable = poseLib.digBlock(
+                turtle.digDown, turtle.inspectDown, target, callbacks.alert)
+              if not dug then
+                if unbreakable then break end
+                return false, "Cannot dig column: " .. digReason, index
+              end
             end
             if not turtle.down() then
               return false, "Cannot descend at " .. target.x .. "," .. target.y .. "," .. target.z, index

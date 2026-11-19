@@ -88,11 +88,15 @@ clear at least one slot, then select that drone on the master and touch
 The inventory is considered full when no empty slot remains, even if an
 existing stack has room.
 
-Protected Allthemodium, Vibranium, Unobtainium, bedrock and chests are not dug.
-Protected or undiggable blocks encountered while excavating a column are
-recorded on **WAYPOINTS**, and the rest of that column is skipped. Progress
-counts visited columns, not necessarily successfully removed blocks. A blocked
-travel or return path instead stops the job with an error.
+Turtles attempt to dig blocks without filtering their names or tags. This
+includes chests and other breakable blocks, so keep valuables and other turtles
+out of the quarry and travel paths. If a dig reports an unbreakable block, only
+`allthemodium:allthemodium_ore` and
+`allthemodium:allthemodium_slate_ore` are recorded on **WAYPOINTS**. The rest
+of an affected column is skipped; bedrock and other unbreakable blocks are not
+waypointed. Other dig failures stop the job with an error. Progress counts
+visited columns, not necessarily successfully removed blocks. A blocked travel
+or return path also stops the job with an error.
 
 This is not a general pathfinder: travel may dig a vertical shaft from the
 starting position to one block above the selected Y range, and it may clear
