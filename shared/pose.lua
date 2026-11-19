@@ -27,6 +27,7 @@ local function protectedToken(value)
   if type(value) ~= "string" then return false end
   local name = value:lower()
   if name:find("bedrock", 1, true) then return true end
+  if name:match("chest$") then return true end
   for material in pairs(protectedNames) do
     if name:find(material, 1, true) then return true end
   end
@@ -166,11 +167,12 @@ local function blockAt(data, position)
     .. position.x .. "," .. position.y .. "," .. position.z
 end
 
-local function moveHorizontal(pose, direction, onProtected, onStep)
+local function moveHorizontal(pose, direction, onProtected, onStep, noDig)
   M.turnTo(pose, direction)
   local vector = delta[direction]
   local destination = { x = pose.x + vector.x, y = pose.y, z = pose.z + vector.z }
   for _ = 1, 10 do
+    if turtle.getFuelLevel and turtle.getFuelLevel() == 0 then return false, "out of fuel" end
     local found, data = turtle.inspect()
     if found then
       if isProtected(data) then
@@ -179,6 +181,8 @@ local function moveHorizontal(pose, direction, onProtected, onStep)
       end
       if isTurtle(data) then
         os.sleep(math.random(5, 20) / 10)
+      elseif noDig then
+        return false, "return path blocked by " .. blockAt(data, destination)
       elseif not turtle.dig() then
         alert(data.name or "undiggable", destination, onProtected)
         return false, "dig failed: " .. blockAt(data, destination)
@@ -186,7 +190,10 @@ local function moveHorizontal(pose, direction, onProtected, onStep)
     end
     if turtle.forward() then
       pose.x, pose.z = destination.x, destination.z
-      if onStep then onStep(pose) end
+      if onStep then
+        local ok, reason = onStep(pose)
+        if ok == false then return false, reason end
+      end
       return true
     end
     if not turtle.detect() then
@@ -199,6 +206,8 @@ local function moveHorizontal(pose, direction, onProtected, onStep)
       end
       if not blocked or isTurtle(block) then
         os.sleep(math.random(5, 20) / 10)
+      elseif noDig then
+        return false, "return path blocked by " .. blockAt(block, destination)
       elseif not turtle.dig() then
         alert(block.name or "undiggable", destination, onProtected)
         return false, "dig failed: " .. blockAt(block, destination)
@@ -208,7 +217,7 @@ local function moveHorizontal(pose, direction, onProtected, onStep)
   return false, "movement retry limit reached"
 end
 
-local function moveVertical(pose, amount, onProtected, onStep)
+local function moveVertical(pose, amount, onProtected, onStep, noDig)
   local direction = amount > 0 and "up" or "down"
   local move = amount > 0 and turtle.up or turtle.down
   local detect = amount > 0 and turtle.detectUp or turtle.detectDown
@@ -219,6 +228,7 @@ local function moveVertical(pose, amount, onProtected, onStep)
     local destination = { x = pose.x, y = pose.y + dy, z = pose.z }
     local moved = false
     for attempt = 1, 10 do
+      if turtle.getFuelLevel and turtle.getFuelLevel() == 0 then return false, "out of fuel" end
       local found, data = inspect()
       if found then
         if isProtected(data) then
@@ -227,6 +237,8 @@ local function moveVertical(pose, amount, onProtected, onStep)
         end
         if isTurtle(data) then
           os.sleep(math.random(5, 20) / 10)
+        elseif noDig then
+          return false, "return path blocked by " .. blockAt(data, destination)
         elseif not dig() then
           alert(data.name or "undiggable", destination, onProtected)
           return false, direction .. " dig failed: " .. blockAt(data, destination)
@@ -234,7 +246,10 @@ local function moveVertical(pose, amount, onProtected, onStep)
       end
       if move() then
         pose.y = destination.y
-        if onStep then onStep(pose) end
+        if onStep then
+          local ok, reason = onStep(pose)
+          if ok == false then return false, reason end
+        end
         moved = true
         break
       end
@@ -247,6 +262,8 @@ local function moveVertical(pose, amount, onProtected, onStep)
           return false, "protected block " .. blockAt(block, destination)
         elseif blocked and isTurtle(block) then
           os.sleep(math.random(5, 20) / 10)
+        elseif blocked and noDig then
+          return false, "return path blocked by " .. blockAt(block, destination)
         elseif blocked and attempt == 10 then
           return false, direction .. " movement failed: " .. tostring(block.name)
         elseif not blocked then
@@ -259,7 +276,7 @@ local function moveVertical(pose, amount, onProtected, onStep)
   return true
 end
 
-function M.moveTo(pose, x, y, z, onProtected, maxSteps, onStep)
+function M.moveTo(pose, x, y, z, onProtected, maxSteps, onStep, noDig)
   local steps = 0
   local function horizontal(axis, target)
     while pose[axis] ~= target do
@@ -268,7 +285,7 @@ function M.moveTo(pose, x, y, z, onProtected, maxSteps, onStep)
       local direction
       if axis == "x" then direction = target > pose.x and 1 or 3
       else direction = target > pose.z and 2 or 0 end
-      local ok, reason = moveHorizontal(pose, direction, onProtected, onStep)
+      local ok, reason = moveHorizontal(pose, direction, onProtected, onStep, noDig)
       if not ok then return false, reason end
     end
     return true
@@ -277,7 +294,7 @@ function M.moveTo(pose, x, y, z, onProtected, maxSteps, onStep)
   if pose.y ~= y then
     steps = steps + math.abs(y - pose.y)
     if steps > (maxSteps or config.maxTravelSteps) then return false, "travel step limit reached" end
-    local ok, reason = moveVertical(pose, y - pose.y, onProtected, onStep)
+    local ok, reason = moveVertical(pose, y - pose.y, onProtected, onStep, noDig)
     if not ok then return false, reason end
   end
   local ok, reason = horizontal("x", x)

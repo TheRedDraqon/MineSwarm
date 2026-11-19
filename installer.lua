@@ -1,13 +1,8 @@
 local roles = {
   master = {
     "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",
-    "shared/pose.lua", "master/ore_db.lua", "master/partition.lua",
-    "master/quarries.lua", "master/ui.lua", "master/config_editor.lua",
+    "master/ore_db.lua", "master/quarries.lua", "master/ui.lua",
     "master/main.lua", "update.lua",
-  },
-  deployer = {
-    "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",
-    "shared/pose.lua", "deployer/main.lua", "update.lua",
   },
   drone = {
     "shared/config.lua", "shared/util.lua", "shared/net.lua", "shared/state.lua",
@@ -23,16 +18,15 @@ local function prompt(text, default)
   return value
 end
 
-local defaultBaseUrl = "https://raw.githubusercontent.com/TheRedDraqon/MineSwarm/refs/heads/master"
+local defaultBaseUrl = "https://raw.githubusercontent.com/TheRedDraqon/MineSwarm/refs/heads/Simple"
 local baseUrl = defaultBaseUrl
 if not baseUrl or baseUrl == "" then error("A source base URL is required") end
 baseUrl = baseUrl:gsub("/+$", "")
-local role = prompt("Install role (master/deployer/drone/gps)")
-if not roles[role] then error("Role must be master, deployer, drone, or gps") end
+local role = prompt("Install role (master/drone/gps)")
+if not roles[role] then error("Role must be master, drone, or gps") end
 
 local label
-if role == "deployer" then label = prompt("Computer label", "Deployer")
-elseif role == "drone" then label = prompt("Turtle label (blank keeps/creates a default)", "") end
+if role == "drone" then label = prompt("Turtle label (blank keeps/creates a default)", "") end
 local gpsPosition
 if role == "gps" then
   gpsPosition = {}
@@ -74,25 +68,8 @@ for relativePath, contents in pairs(downloads) do
   writeFile("/mineswarm/" .. relativePath, contents)
 end
 
-if role == "master" and not fs.exists("/mineswarm/master_config") then
-  writeFile("/mineswarm/master_config", textutils.serialize({
-    configured = false,
-    mode = "simple",
-    deployerLabel = "Deployer",
-  }))
-elseif role == "deployer" and not fs.exists("/mineswarm/deployer_config") then
-  writeFile("/mineswarm/deployer_config", textutils.serialize({
-    supplySide = "front",
-    placeDirection = "down",
-    labelPrefix = "Miner_",
-  }))
-end
-
 if role == "master" then
   writeFile("/startup.lua", 'shell.run("mineswarm/update.lua", "master")\nshell.run("mineswarm/master/main.lua")\n')
-elseif role == "deployer" then
-  if label and label ~= "" then os.setComputerLabel(label) end
-  writeFile("/startup.lua", 'shell.run("mineswarm/update.lua", "deployer")\nshell.run("mineswarm/deployer/main.lua")\n')
 elseif role == "drone" then
   if label and label ~= "" then os.setComputerLabel(label) end
   writeFile("/startup.lua", 'shell.run("mineswarm/update.lua", "drone")\nshell.run("mineswarm/drone/main.lua")\n')
@@ -102,9 +79,6 @@ else
 end
 
 print("Installed MineSwarm role: " .. role)
-if role == "master" then
-  print("Simple mode is ready by default. Press M to switch to Complex mode.")
-end
 print("Rebooting in 3 seconds...")
 sleep(3)
 os.reboot()

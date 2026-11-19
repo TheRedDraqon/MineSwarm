@@ -1,248 +1,124 @@
 local poseLib = require("shared.pose")
 local util = require("shared.util")
-local config = require("shared.config")
 
 local M = {}
 
-local function countItems()
-  local items = {}
-  for slot = 1, 16 do
-    local detail = turtle.getItemDetail(slot)
-    if detail then
-      items[detail.name] = (items[detail.name] or 0) + detail.count
-    end
-  end
-  return items
-end
-
-local function autoRefuel(threshold)
-  if turtle.getFuelLevel() == "unlimited" then return true end
-  while turtle.getFuelLevel() < threshold do
-    local fuelSlot
-    for slot = 1, 16 do
-      local detail = turtle.getItemDetail(slot)
-      if detail and (detail.name:find("coal", 1, true) or detail.name:find("charcoal", 1, true)) then
-        fuelSlot = slot
-        break
-      end
-    end
-    if not fuelSlot then return false end
-    local before = turtle.getFuelLevel()
-    turtle.select(fuelSlot)
-    if not turtle.refuel(1) or turtle.getFuelLevel() <= before then return false end
-  end
+local function move(pose, x, y, z, callbacks, watchInventory, noDig)
+  local ok, reason = poseLib.moveTo(pose, x, y, z, callbacks.alert, nil, function(current)
+    callbacks.tick(current)
+    if watchInventory and util.inventoryFull() then return false, "inventory_full" end
+  end, noDig)
+  if not ok then return false, tostring(reason) end
   return true
 end
 
-local function clearColumn(pose, task, callbacks)
-  local depth = task.bounds.y2 - task.bounds.y1 + 1
-  for _ = 1, depth do
-    if util.inventoryFull() then return true, "inventory_full" end
-    local found, data = turtle.inspectDown()
-    if found then
-      local target = { x = pose.x, y = pose.y - 1, z = pose.z }
-      if poseLib.isProtected(data) then
-        callbacks.alert(data.name, target)
-        return true, "protected"
-      end
-      if not turtle.digDown() then
-        if util.inventoryFull() then return true, "inventory_full" end
-        callbacks.alert(data.name or "unknown_block", target)
-        return true, "undiggable"
-      end
-    end
-    if not turtle.down() then
-      local blocked, block = turtle.inspectDown()
-      if util.inventoryFull() then return true, "inventory_full" end
-      if blocked and poseLib.isProtected(block) then
-        callbacks.alert(block.name, { x = pose.x, y = pose.y - 1, z = pose.z })
-        return true, "protected"
-      end
-      return false, "Could not descend at " .. pose.x .. "," .. (pose.y - 1) .. "," .. pose.z
-    end
-    pose.y = pose.y - 1
-    if not autoRefuel(1) then return true, "fuel_low" end
-    callbacks.tick(pose)
+local function unload(pose, task, callbacks)
+  local home, startY = task.home, task.bounds.y2 + 1
+  callbacks.setState("RETURNING")
+  local ok, reason = true, nil
+  if pose.x ~= home.x or pose.y ~= home.y or pose.z ~= home.z then
+    ok, reason = move(pose, home.x, startY, home.z, callbacks, false, true)
+    if ok then ok, reason = move(pose, home.x, home.y, home.z, callbacks, false, true) end
   end
-
-  local ok, reason = poseLib.moveTo(pose, pose.x, task.bounds.y2 + 1, pose.z,
-    callbacks.alert, nil, callbacks.tick)
-  if not ok then return false, "Could not return above column: " .. tostring(reason) end
-  return true
-end
-
-local function unloadAtHome(pose, task, callbacks, fuelTarget)
-  local dropDirection = task.home.dropDir or task.home.dir
-  if dropDirection ~= nil then poseLib.turnTo(pose, dropDirection) end
-  local before = countItems()
+  if not ok then return false, "Cannot return to chest: " .. reason end
+  poseLib.turnTo(pose, home.dropDir)
+  local found, block = turtle.inspect()
+  if not found or type(block.name) ~= "string" or not block.name:lower():match("chest$") then
+    return false, "Chest is missing at home; refusing to drop items"
+  end
   for slot = 1, 16 do
     if turtle.getItemCount(slot) > 0 then
       turtle.select(slot)
-      if not turtle.drop() then return false, "Drop-off chest unavailable or blocked" end
+      if not turtle.drop() then return false, "Chest unavailable or full at home" end
     end
   end
-  if util.slotCount() > 0 then return false, "Not all inventory items were unloaded" end
-  callbacks.yield(before)
-  if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < fuelTarget then
-    local chest = peripheral.wrap("front")
-    if not chest or type(chest.list) ~= "function" then
-      return false, "No refuel inventory is connected in front at the FOB"
-    end
-    while turtle.getFuelLevel() < fuelTarget do
-      local fuelSlot
-      for slot, item in pairs(chest.list()) do
-        local name = tostring(item.name):lower()
-        if name:find("coal", 1, true) or name:find("charcoal", 1, true) then
-          fuelSlot = slot
-          break
-        end
-      end
-      if not fuelSlot then break end
-      turtle.select(1)
-      if not turtle.suckFromSlot(fuelSlot, 16) then break end
-      autoRefuel(fuelTarget)
-    end
-    if not autoRefuel(fuelTarget) then return false, "No usable refuel item at the FOB" end
-  end
+  if util.slotCount() > 0 then return false, "Chest could not accept all items" end
+  callbacks.setState("MINING")
   return true
 end
 
-local function maybeReturn(pose, task, callbacks, force, fuelTarget)
-  if force or util.inventoryFull() or not autoRefuel(fuelTarget) then
-    callbacks.setState("RETURNING")
-    local home = task.home
-    local ok, reason = poseLib.moveTo(pose, home.x, config.transitY, home.z,
-      callbacks.alert, nil, callbacks.tick)
-    if ok then
-      ok, reason = poseLib.moveTo(pose, home.x, home.y, home.z,
-        callbacks.alert, nil, callbacks.tick)
-    end
-    if not ok then return false, "Unable to return to FOB: " .. tostring(reason) end
-    ok, reason = unloadAtHome(pose, task, callbacks, fuelTarget)
+local function space(pose, task, callbacks)
+  if not util.inventoryFull() then return true, false end
+  if task.chest then
+    local ok, reason = unload(pose, task, callbacks)
     if not ok then return false, reason end
-    callbacks.setState("MINING")
     return true, true
   end
-  callbacks.setState("MINING")
+  callbacks.waitForSpace()
   return true, false
 end
 
+local function moveToWork(pose, task, x, y, z, callbacks)
+  while true do
+    local ok, reason = space(pose, task, callbacks)
+    if not ok then return false, reason end
+    ok, reason = move(pose, x, y, z, callbacks, true)
+    if ok then return true end
+    if reason ~= "inventory_full" then return false, reason end
+  end
+end
+
 function M.run(pose, task, callbacks, progress)
-  local width = task.bounds.x2 - task.bounds.x1 + 1
-  local length = task.bounds.z2 - task.bounds.z1 + 1
+  local bounds = task.bounds
+  local width = bounds.x2 - bounds.x1 + 1
+  local length = bounds.z2 - bounds.z1 + 1
   local total = width * length
+  local startY = bounds.y2 + 1
   local index = progress or 0
-  local startY = task.bounds.y2 + 1
-  local depth = task.bounds.y2 - task.bounds.y1 + 1
-  local home = task.home
-  local access = task.access or { x = task.bounds.x1 - 1, z = task.bounds.z1 - 1 }
-  local xDistance = math.max(math.abs(task.bounds.x1 - home.x), math.abs(task.bounds.x2 - home.x),
-    math.abs(access.x - home.x))
-  local zDistance = math.max(math.abs(task.bounds.z1 - home.z), math.abs(task.bounds.z2 - home.z),
-    math.abs(access.z - home.z))
-  local fuelTarget = math.abs(config.transitY - startY)
-    + math.abs(config.transitY - home.y)
-    + xDistance + zDistance
-    + depth * 2 + 100
-  fuelTarget = math.max(config.lowFuel, fuelTarget)
 
-  local ready, reason = maybeReturn(pose, task, callbacks, false, fuelTarget)
-  if not ready then return false, reason, index end
-  callbacks.setState("TRANSIT")
-  local ok
-  ok, reason = poseLib.moveTo(pose, pose.x, config.transitY, pose.z,
-    callbacks.alert, nil, callbacks.tick)
-  if ok then
-    ok, reason = poseLib.moveTo(pose, access.x, config.transitY, access.z,
-      callbacks.alert, nil, callbacks.tick)
-  end
-  if ok then
-    ok, reason = poseLib.moveTo(pose, access.x, startY, access.z,
-      callbacks.alert, nil, callbacks.tick)
-  end
-  if ok then
-    ok, reason = poseLib.moveTo(pose, task.bounds.x1, startY, task.bounds.z1,
-      callbacks.alert, nil, callbacks.tick)
-  end
-  if not ok then return false, "Unable to reach sector: " .. tostring(reason) end
-  callbacks.setState("MINING")
-
-  local transitNeeded = false
   for xi = 0, width - 1 do
-    local x = task.bounds.x1 + xi
-    local zOffsetStart = (xi % 2 == 0) and 0 or length - 1
-    local zStep = (xi % 2 == 0) and 1 or -1
+    local x = bounds.x1 + xi
     for zi = 0, length - 1 do
-      local z = task.bounds.z1 + zOffsetStart + (zi * zStep)
-      local columnNumber = xi * length + zi + 1
-      if columnNumber > index then
-        local columnDone = false
-        while not columnDone do
-          if transitNeeded then
-            ok, reason = poseLib.moveTo(pose, pose.x, config.transitY, pose.z,
-              callbacks.alert, nil, callbacks.tick)
-            if ok then
-              ok, reason = poseLib.moveTo(pose, access.x, config.transitY, access.z,
-                callbacks.alert, nil, callbacks.tick)
+      local z = bounds.z1 + (xi % 2 == 0 and zi or length - 1 - zi)
+      local column = xi * length + zi + 1
+      if column > index then
+        local finished = false
+        while not finished do
+          local ok, result = space(pose, task, callbacks)
+          if not ok then return false, result, index end
+          callbacks.setState("MINING")
+          ok, result = moveToWork(pose, task, x, startY, z, callbacks)
+          if not ok then return false, "Cannot reach column: " .. result, index end
+          local returned = false
+          while pose.y > bounds.y1 do
+            callbacks.tick(pose)
+            ok, result = space(pose, task, callbacks)
+            if not ok then return false, result, index end
+            if result then returned = true; break end
+            if turtle.getFuelLevel() ~= "unlimited" and turtle.getFuelLevel() < 1 then
+              return false, "Out of fuel at " .. pose.x .. "," .. pose.y .. "," .. pose.z, index
             end
-            if ok then
-              ok, reason = poseLib.moveTo(pose, access.x, startY, access.z,
-                callbacks.alert, nil, callbacks.tick)
+            local found, block = turtle.inspectDown()
+            local target = { x = pose.x, y = pose.y - 1, z = pose.z }
+            if found and poseLib.isProtected(block) then
+              callbacks.alert(block.name, target)
+              break
             end
-            if ok then
-              ok, reason = poseLib.moveTo(pose, x, startY, z,
-                callbacks.alert, nil, callbacks.tick)
+            if found and not turtle.digDown() then
+              callbacks.alert(block.name or "unknown block", target)
+              break
             end
-            transitNeeded = false
-          else
-            ok, reason = poseLib.moveTo(pose, x, startY, z,
-              callbacks.alert, nil, callbacks.tick)
+            if not turtle.down() then
+              return false, "Cannot descend at " .. target.x .. "," .. target.y .. "," .. target.z, index
+            end
+            pose.y = pose.y - 1
+            callbacks.tick(pose)
           end
-          if not ok then return false, "Transit between columns failed: " .. tostring(reason) end
-          ok, reason = clearColumn(pose, task, callbacks)
-          if not ok then return false, reason end
-          if reason == "inventory_full" or reason == "fuel_low" then
-            local returned, returnReason = maybeReturn(pose, task, callbacks, true, fuelTarget)
-            if not returned then return false, returnReason, index end
-            transitNeeded = true
-          else
-            columnDone = true
+          if not returned then
+            ok, result = space(pose, task, callbacks)
+            if not ok then return false, result, index end
+            if not result then
+              ok, result = moveToWork(pose, task, x, startY, z, callbacks)
+              if not ok then return false, "Cannot leave column: " .. result, index end
+              finished = true
+            end
           end
         end
-        index = columnNumber
+        index = column
         callbacks.progress(index, total, pose)
-        if callbacks.recallRequested() then
-          callbacks.setState("RETURNING")
-          ok, reason = poseLib.moveTo(pose, task.home.x, config.transitY, task.home.z,
-            callbacks.alert, nil, callbacks.tick)
-          if ok then
-            ok, reason = poseLib.moveTo(pose, task.home.x, task.home.y, task.home.z,
-              callbacks.alert, nil, callbacks.tick)
-          end
-          if not ok then return false, "Unable to recall to FOB: " .. tostring(reason), index end
-          ok, reason = unloadAtHome(pose, task, callbacks, fuelTarget)
-          if not ok then return false, reason, index end
-          callbacks.setState("IDLE")
-          return true, "recalled", index
-        end
-        local returned
-        ok, returned = maybeReturn(pose, task, callbacks, false, fuelTarget)
-        if not ok then return false, returned, index end
-        if returned then transitNeeded = true end
       end
     end
   end
-  callbacks.setState("RETURNING")
-  ok, reason = poseLib.moveTo(pose, task.home.x, config.transitY, task.home.z,
-    callbacks.alert, nil, callbacks.tick)
-  if ok then
-    ok, reason = poseLib.moveTo(pose, task.home.x, task.home.y, task.home.z,
-      callbacks.alert, nil, callbacks.tick)
-  end
-  if not ok then return false, "Unable to return after mining: " .. tostring(reason), index end
-  ok, reason = unloadAtHome(pose, task, callbacks, fuelTarget)
-  if not ok then return false, reason, index end
-  callbacks.setState("COMPLETE")
   return true, nil, index
 end
 

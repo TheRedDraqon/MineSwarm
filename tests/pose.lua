@@ -118,4 +118,18 @@ assert(alertReason:find(blockedCoordinate, 1, true),
 assert(#alerts == 1 and alerts[1].pos.y == blockedDown.y)
 assert(position.y == pose.y)
 
+blockedDown = nil
+local stepPose = { x = pose.x, y = pose.y, z = pose.z, dir = pose.dir }
+local stopped, stopReason = poseLib.moveTo(stepPose, stepPose.x + 2, stepPose.y, stepPose.z,
+  nil, nil, function() return false, "inventory_full" end)
+assert(not stopped and stopReason == "inventory_full" and stepPose.x == pose.x + 1,
+  "movement must stop after the step where inventory fills")
+
+blockedForward[1] = true
+local digCount = #dugDirections
+local returned, returnReason = poseLib.moveTo(stepPose, stepPose.x + 1, stepPose.y, stepPose.z,
+  nil, nil, nil, true)
+assert(not returned and returnReason:find("return path blocked", 1, true))
+assert(#dugDirections == digCount, "a full-inventory return must not dig additional blocks")
+
 print("MineSwarm pose movement tests passed")

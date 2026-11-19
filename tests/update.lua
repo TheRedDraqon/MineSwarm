@@ -1,9 +1,12 @@
 local root = "/home/alex/ComputerCraft/MineSwarm"
-local baseUrl = "https://raw.githubusercontent.com/TheRedDraqon/MineSwarm/refs/heads/master"
+local baseUrl = "https://raw.githubusercontent.com/TheRedDraqon/MineSwarm/refs/heads/Simple"
 local files, directories = {}, { ["/"] = true, ["/mineswarm"] = true }
 local requests = 0
 local failPath
 local failMoveTo
+local failWriteTo
+local writes = {}
+local closed = {}
 
 local function ensureDirectory(path)
   if path == "" or path == "/" then directories["/"] = true; return end
@@ -37,8 +40,18 @@ fs = {
     end
     local chunks = {}
     return {
-      write = function(value) chunks[#chunks + 1] = tostring(value) end,
-      close = function() files[path] = table.concat(chunks) end,
+      write = function(value)
+        writes[#writes + 1] = path
+        if path == failWriteTo then
+          chunks[#chunks + 1] = tostring(value):sub(1, 10)
+          error("Out of space")
+        end
+        chunks[#chunks + 1] = tostring(value)
+      end,
+      close = function()
+        closed[path] = true
+        files[path] = table.concat(chunks)
+      end,
     }
   end,
 }
@@ -66,17 +79,26 @@ end
 
 files["/mineswarm/version"] = "0.9.9\n"
 runUpdater("drone")
-assert(files["/mineswarm/version"] == "1.1.0\n")
+assert(files["/mineswarm/version"] == "2.0.0\n")
 assert(files["/mineswarm/drone/main.lua"] ~= nil)
 assert(files["/mineswarm/shared/pose.lua"] ~= nil)
 assert(files["/mineswarm/update.lua"] ~= nil)
 local upgradedRequests = requests
 
-files["/mineswarm/version"] = "1.1.0\n"
+files["/mineswarm/version"] = "2.0.0\n"
 requests = 0
 runUpdater("drone")
-assert(files["/mineswarm/version"] == "1.1.0\n", "updater must not downgrade")
+assert(files["/mineswarm/version"] == "2.0.0\n", "updater must not downgrade")
 assert(requests == 1, "an up-to-date or newer client should fetch only the manifest")
+
+files["/mineswarm/version"] = "1.0.0\n"
+files["/mineswarm/drone/main.lua.update.tmp"] = "left over from previous failure"
+writes = {}
+runUpdater("drone")
+assert(files["/mineswarm/version"] == "2.0.0\n")
+assert(files["/mineswarm/drone/main.lua.update.tmp"] == nil)
+assert(#writes == 1 and writes[1] == "/mineswarm/version.update.tmp",
+  "unchanged installed files should not be staged again")
 
 files = { ["/mineswarm/version"] = "0.9.9\n" }
 requests = 0
@@ -92,5 +114,17 @@ runUpdater("drone")
 assert(files["/mineswarm/version"] == "0.9.9\n", "failed file replacement must preserve local version")
 assert(files["/mineswarm/shared/pose.lua"] == nil, "failed replacement must roll back earlier files")
 assert(files["/mineswarm/drone/main.lua"] == nil)
+
+files = { ["/mineswarm/version"] = "0.9.9\n" }
+writes, closed = {}, {}
+failWriteTo = "/mineswarm/drone/main.lua.update.tmp"
+runUpdater("drone")
+assert(files["/mineswarm/version"] == "0.9.9\n", "failed staging must not advance version")
+assert(files[failWriteTo] == nil, "partial staged file must be removed after a write failure")
+assert(closed[failWriteTo], "failed write handle must be closed before cleanup")
+for path in pairs(files) do
+  assert(not path:match("%.update%.tmp$"), "all staged files must be cleaned after failure")
+end
+failWriteTo = nil
 
 print("MineSwarm updater version and transaction tests passed")

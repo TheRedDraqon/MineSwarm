@@ -1,4 +1,4 @@
-local BASE_URL = "https://raw.githubusercontent.com/TheRedDraqon/MineSwarm/refs/heads/master"
+local BASE_URL = "https://raw.githubusercontent.com/TheRedDraqon/MineSwarm/refs/heads/Simple"
 local ROOT = "/mineswarm"
 
 local function report(message)
@@ -44,8 +44,7 @@ local function parseManifest(contents, role)
     if line ~= "" and line:sub(1, 1) ~= "#" then
       local name = line:match("^%[([%w_%-]+)%]$")
       if name then
-        if name ~= "common" and name ~= "master" and name ~= "deployer"
-          and name ~= "drone" and name ~= "gps" then
+        if name ~= "common" and name ~= "master" and name ~= "drone" and name ~= "gps" then
           return nil, "Unknown manifest section: " .. name
         end
         section = name
@@ -108,8 +107,21 @@ local function writeFile(path, contents)
   ensureParent(path)
   local file = fs.open(path, "w")
   if not file then error("Cannot write " .. path) end
-  file.write(contents)
-  file.close()
+  local ok, reason = pcall(file.write, contents)
+  local closeOk, closeReason = pcall(file.close)
+  if not ok then error("Cannot write " .. path .. ": " .. tostring(reason)) end
+  if not closeOk then error("Cannot close " .. path .. ": " .. tostring(closeReason)) end
+end
+
+local function matchesFile(path, contents)
+  if not fs.exists(path) then return false end
+  local file, reason = fs.open(path, "r")
+  if not file then error("Cannot read " .. path .. ": " .. tostring(reason)) end
+  local ok, existing = pcall(file.readAll)
+  local closeOk, closeReason = pcall(file.close)
+  if not ok then error("Cannot read " .. path .. ": " .. tostring(existing)) end
+  if not closeOk then error("Cannot close " .. path .. ": " .. tostring(closeReason)) end
+  return existing == contents
 end
 
 local function stageFile(path, contents)
@@ -151,7 +163,7 @@ local function applyFiles(staged)
 end
 
 local function update(role)
-  if role ~= "master" and role ~= "deployer" and role ~= "drone" and role ~= "gps" then
+  if role ~= "master" and role ~= "drone" and role ~= "gps" then
     report("Unknown role; skipping update")
     return
   end
@@ -200,14 +212,29 @@ local function update(role)
   end
 
   local staged = {}
+  local currentTemporary
   local stageOk, stageError = pcall(function()
     for _, item in ipairs(contents) do
-      staged[#staged + 1] = stageFile(item.path, item.data)
+      local temporary = ROOT .. "/" .. item.path .. ".update.tmp"
+      if fs.exists(temporary) then fs.delete(temporary) end
     end
+    local versionTemporary = ROOT .. "/version.update.tmp"
+    if fs.exists(versionTemporary) then fs.delete(versionTemporary) end
+    for _, item in ipairs(contents) do
+      local destination = ROOT .. "/" .. item.path
+      if not matchesFile(destination, item.data) or fs.exists(destination .. ".update.bak") then
+        currentTemporary = destination .. ".update.tmp"
+        staged[#staged + 1] = stageFile(item.path, item.data)
+        currentTemporary = nil
+      end
+    end
+    currentTemporary = ROOT .. "/version.update.tmp"
     staged[#staged + 1] = stageFile("version", manifest.version .. "\n")
+    currentTemporary = nil
     applyFiles(staged)
   end)
   if not stageOk then
+    if currentTemporary and fs.exists(currentTemporary) then fs.delete(currentTemporary) end
     for _, file in ipairs(staged) do
       if fs.exists(file.temporary) then fs.delete(file.temporary) end
     end

@@ -1,12 +1,5 @@
 local M = {}
 
-M.layers = {
-  Stone = { minY = 129, maxY = 247 },
-  Deepslate = { minY = 65, maxY = 128 },
-  Nether = { minY = 1, maxY = 64 },
-  End = { minY = -63, maxY = 0 },
-}
-
 M.ores = {
   Coal = { minY = 146, maxY = 166, fullMinY = 65, fullMaxY = 247 },
   Iron = { minY = 146, maxY = 166, fullMinY = 65, fullMaxY = 247 },
@@ -33,21 +26,11 @@ M.ores = {
   Lead = { minY = -56, maxY = -26, fullMinY = -63, fullMaxY = -19 },
 }
 
-function M.jobY(mode, preset, depth)
-  local range
-  if mode == "ore" then
-    range = M.ores[preset]
-    if not range then return nil, "Unknown ore: " .. tostring(preset) end
-    if range.logOnly then return nil, preset .. " is log-only and cannot be a mining target" end
-    return range.minY, range.maxY
-  end
-  range = M.layers[preset]
-  if not range then return nil, "Unknown layer: " .. tostring(preset) end
-  if type(depth) ~= "number" or depth < 1 or depth % 1 ~= 0 then
-    return nil, "Layer depth must be a positive whole number"
-  end
-  local actualDepth = math.min(depth, range.maxY - range.minY + 1)
-  return range.maxY - actualDepth + 1, range.maxY
+function M.jobY(preset)
+  local range = M.ores[preset]
+  if not range then return nil, "Unknown ore: " .. tostring(preset) end
+  if range.logOnly then return nil, preset .. " is log-only and cannot be a mining target" end
+  return range.minY, range.maxY
 end
 
 return M
