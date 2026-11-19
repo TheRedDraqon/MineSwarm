@@ -1,5 +1,9 @@
 local M = {}
 
+function M.isDroneLabel(label)
+  return type(label) == "string" and label:match("^[A-Za-z0-9]+$") ~= nil
+end
+
 function M.log(...)
   local parts = {}
   for i = 1, select("#", ...) do

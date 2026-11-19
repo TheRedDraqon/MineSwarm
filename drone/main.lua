@@ -7,13 +7,15 @@ local stateLib = require("shared.state")
 local poseLib = require("shared.pose")
 local miner = require("drone.miner")
 
-local dataPath = "/mineswarm/simple_drone_state"
-local state = stateLib.load(dataPath, { progress = 0, mode = "IDLE" })
 local label = os.getComputerLabel()
 if not label or label == "" then
-  label = "Miner_" .. os.getComputerID()
+  label = "Miner" .. os.getComputerID()
   os.setComputerLabel(label)
+elseif not util.isDroneLabel(label) then
+  error("Invalid turtle label. Use only letters and numbers; for example: label set Drone1")
 end
+local dataPath = "/mineswarm/simple_drone_state"
+local state = stateLib.load(dataPath, { progress = 0, mode = "IDLE" })
 local pose, reason = poseLib.calibrate()
 if not pose then error(reason) end
 local activeTask = state.task

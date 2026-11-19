@@ -13,6 +13,7 @@ package.preload["shared.config"] = function() return { heartbeatSeconds = 5 } en
 package.preload["shared.util"] = function()
   return {
     log = function() end,
+    isDroneLabel = dofile("shared/util.lua").isDroneLabel,
     slotCount = function()
       local count = 0
       for i = 1, 16 do if slots[i] > 0 then count = count + 1 end end

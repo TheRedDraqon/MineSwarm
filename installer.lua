@@ -26,7 +26,16 @@ local role = prompt("Install role (master/drone/gps)")
 if not roles[role] then error("Role must be master, drone, or gps") end
 
 local label
-if role == "drone" then label = prompt("Turtle label (blank keeps/creates a default)", "") end
+if role == "drone" then
+  while true do
+    label = prompt("Turtle label (letters/numbers only; blank keeps/creates a default)", "")
+    local effectiveLabel = label ~= "" and label or os.getComputerLabel()
+    if not effectiveLabel or effectiveLabel == "" or effectiveLabel:match("^[A-Za-z0-9]+$") then
+      break
+    end
+    print("Invalid turtle label. Use only letters A-Z and numbers 0-9.")
+  end
+end
 local gpsPosition
 if role == "gps" then
   gpsPosition = {}

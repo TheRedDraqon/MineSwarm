@@ -18,6 +18,16 @@ FOB configuration, or shared swarm job.
 
 Restrict modem access to trusted players: messages are not authenticated.
 
+Drone labels must contain only ASCII letters and digits, such as `Drone1`.
+Spaces, underscores, quotes, slashes, and other punctuation are not allowed.
+An unnamed drone receives a name such as `Miner123`.
+
+Before upgrading a drone with an older invalid label (including `Miner_123`),
+finish its active job. After updating, the drone will refuse to start until it
+is renamed at its shell, for example with `label set Miner123`. Jobs are tied
+to the old label, so renaming a drone during an active job does not reconnect
+that job to the new label.
+
 ## Install
 
 After these files are pushed to the `Simple` branch, run on each computer:
@@ -105,7 +115,8 @@ From the project directory:
 
 ```sh
 lua tests/quarries.lua && lua tests/ui.lua && lua tests/miner.lua \
-  && lua tests/drone_pause.lua && lua tests/pose.lua && lua tests/update.lua
+  && lua tests/drone_pause.lua && lua tests/drone_labels.lua \
+  && lua tests/installer_labels.lua && lua tests/pose.lua && lua tests/update.lua
 ```
 
 Also run `luac -p` on Lua files. Test GPS, chest access, fuel, and protected
