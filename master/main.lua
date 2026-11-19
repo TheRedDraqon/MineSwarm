@@ -63,7 +63,7 @@ local function launch(label, xInput, zInput, preset, minY, maxY)
   id = tostring(id)
   local total = (bounds.x2 - bounds.x1 + 1) * (bounds.z2 - bounds.z1 + 1)
   local start = util.copy(drone.pos)
-  local task = { id = id, bounds = bounds, start = start, total = total, format = 2 }
+  local task = { id = id, bounds = util.copy(bounds), start = start, total = total, format = 2 }
   state.jobs[id] = {
     id = id, label = label, bounds = bounds, preset = preset,
     status = "ASSIGNED", progress = 0, total = total,

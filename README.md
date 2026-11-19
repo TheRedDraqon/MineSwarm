@@ -114,7 +114,7 @@ full wipe is not required.
 From the project directory:
 
 ```sh
-lua tests/quarries.lua && lua tests/ui.lua && lua tests/miner.lua \
+lua tests/quarries.lua && lua tests/master_jobs.lua && lua tests/ui.lua && lua tests/miner.lua \
   && lua tests/drone_pause.lua && lua tests/drone_labels.lua \
   && lua tests/installer_labels.lua && lua tests/pose.lua && lua tests/update.lua
 ```
