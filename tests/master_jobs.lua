@@ -57,7 +57,14 @@ package.preload["master.ui"] = function()
       masterState, callbacks = state, handlers
       return {
         draw = function() end, setMessage = function() end,
-        touch = function() handlers.launch("Drone1", "~10", "~10", "Osmium") end,
+        touch = function(x)
+          if x == 2 then
+            assert(not handlers.setFuelPercent(0))
+            assert(handlers.setFuelPercent(75))
+          else
+            handlers.launch("Drone1", "~10", "~10", "Osmium")
+          end
+        end,
       }
     end,
   }
@@ -67,17 +74,30 @@ peripheral = {
   getName = function() return "monitor" end,
 }
 keys = { q = 16 }
-os.epoch = function() return 12345 end
+local epoch = 12344
+os.epoch = function() epoch = epoch + 1; return epoch end
 os.clock = function() return 10 end
 os.startTimer = function() return 1 end
 local events = {
   { "modem_message", nil, nil, nil, {
-    type = "HB", label = "Drone1", pos = { x = 100, y = 100, z = 100 }, state = "IDLE",
+    type = "HB", label = "Drone1", dir = 0, pos = { x = 100, y = 100, z = 100 }, state = "IDLE",
   } },
   { "monitor_touch", "monitor", 1, 1 },
   { "modem_message", nil, nil, nil, {
     type = "HB", label = "Drone1", pos = { x = 100, y = 100, z = 100 },
     state = "MINING", task = "12345", progress = 1,
+  } },
+  { "monitor_touch", "monitor", 2, 1 },
+  { "modem_message", nil, nil, nil, {
+    type = "TASK_DONE", label = "Drone1", task = "12345",
+  } },
+  { "modem_message", nil, nil, nil, {
+    type = "HB", label = "Drone1", dir = 0, pos = { x = 100, y = 100, z = 100 }, state = "IDLE",
+  } },
+  { "monitor_touch", "monitor", 3, 1 },
+  { "modem_message", nil, nil, nil, {
+    type = "HB", label = "Drone1", pos = { x = 100, y = 100, z = 100 },
+    state = "MINING", task = "12346", progress = 1,
   } },
   { "key", keys.q },
 }
@@ -87,14 +107,17 @@ os.pullEventRaw = function()
 end
 
 assert(loadfile("master/main.lua", nil, _ENV))()
-local job = assert(masterState.jobs["12345"])
+local job = assert(masterState.jobs["12346"])
 assert(job.status == "MINING" and job.progress == 1)
 assert(job.bounds.x1 == 100 and job.bounds.x2 == 110)
 assert(job.bounds.y1 == -21 and job.bounds.y2 == -1)
 assert(job.bounds.z1 == 100 and job.bounds.z2 == 110)
-assert(#packets == 1 and packets[1].type == "TASK" and packets[1].target == "Drone1")
-assert(packets[1].task.id == job.id and packets[1].task.bounds.x2 == job.bounds.x2)
+assert(#packets == 2 and packets[2].type == "TASK" and packets[2].target == "Drone1")
+assert(packets[2].task.id == job.id and packets[2].task.bounds.x2 == job.bounds.x2)
+assert(packets[1].task.format == 4 and packets[1].task.fuelPercent == 50)
+assert(packets[2].task.format == 4 and packets[2].task.fuelPercent == 75 and not packets[2].task.dump)
 local saved = assert(textutils.unserialize(files["/mineswarm/simple_master_state"]))
 assert(saved.jobs[job.id].progress == 1 and saved.jobs[job.id].task.bounds.z2 == 110)
+assert(saved.fuelPercent == 75 and #saved.waypoints == 0)
 assert(callbacks ~= nil)
 print("MineSwarm master job persistence tests passed")

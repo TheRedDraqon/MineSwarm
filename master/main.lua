@@ -9,7 +9,9 @@ local quarries = require("master.quarries")
 local uiLib = require("master.ui")
 
 local dataPath = "/mineswarm/simple_master_state"
-local state = stateLib.load(dataPath, { drones = {}, jobs = {}, waypoints = {} })
+local state = stateLib.load(dataPath, {
+  drones = {}, jobs = {}, waypoints = {}, clearedDumps = {}, fuelPercent = 50,
+})
 for _, drone in pairs(state.drones) do drone.online = false end
 for _, job in pairs(state.jobs) do
   if quarries.active(job) then job.status = "OFFLINE" end
@@ -25,6 +27,10 @@ local ui
 
 local function save()
   stateLib.save(state, dataPath)
+end
+
+local function positionKey(pos)
+  return pos.x .. "," .. pos.y .. "," .. pos.z
 end
 
 local function activeJob(label)
@@ -49,11 +55,12 @@ local function launch(label, xInput, zInput, preset, minY, maxY)
   end
   local bounds, reason = quarries.bounds(drone.pos, xInput, zInput, y1, y2)
   if not bounds then ui.setMessage(reason); return end
-  local overlap = quarries.findOverlap(bounds, state.jobs)
+  local overlap = quarries.findOverlap(bounds, state.jobs, state.waypoints)
   if overlap then
     ui.setMessage("X/Z area overlaps active job " .. tostring(overlap))
     return
   end
+  if drone.pos.y < bounds.y2 + 1 then ui.setMessage("Start at or above the quarry's top layer"); return end
 
   for oldId, job in pairs(state.jobs) do
     if job.label == label and not quarries.active(job) then state.jobs[oldId] = nil end
@@ -63,7 +70,8 @@ local function launch(label, xInput, zInput, preset, minY, maxY)
   id = tostring(id)
   local total = (bounds.x2 - bounds.x1 + 1) * (bounds.z2 - bounds.z1 + 1)
   local start = util.copy(drone.pos)
-  local task = { id = id, bounds = util.copy(bounds), start = start, total = total, format = 2 }
+  local task = { id = id, bounds = util.copy(bounds), start = start,
+    fuelPercent = state.fuelPercent, total = total, format = 4 }
   state.jobs[id] = {
     id = id, label = label, bounds = bounds, preset = preset,
     status = "ASSIGNED", progress = 0, total = total,
@@ -85,12 +93,28 @@ local function command(label, action)
 end
 
 local function clearWaypoint(index)
+  local point = state.waypoints[index]
+  if point and point.kind == "DUMP" then
+    local job = activeJob(point.label)
+    state.clearedDumps[positionKey(point.pos)] = job and job.id or true
+  end
   table.remove(state.waypoints, index)
   save()
 end
 
+local function setFuelPercent(value)
+  if type(value) ~= "number" or value % 1 ~= 0 or value < 1 or value > 100 then
+    ui.setMessage("Fuel percentage must be from 1 to 100")
+    return false
+  end
+  state.fuelPercent = value
+  save()
+  ui.setMessage("Fuel target set to " .. value .. "% for new jobs")
+  return true
+end
+
 ui = uiLib.new(monitor, state, {
-  launch = launch, command = command, clearWaypoint = clearWaypoint,
+  launch = launch, command = command, clearWaypoint = clearWaypoint, setFuelPercent = setFuelPercent,
 })
 
 local function handleHeartbeat(packet)
@@ -108,6 +132,28 @@ local function handleHeartbeat(packet)
   drone.fuel, drone.inventory, drone.error = packet.fuel, packet.inventory, packet.error
   state.drones[packet.label] = drone
   local job = activeJob(packet.label)
+  if type(packet.dump) == "table" then
+    local pos = packet.dump
+    if type(pos.x) == "number" and type(pos.y) == "number" and type(pos.z) == "number" then
+      local key = positionKey(pos)
+      local cleared = state.clearedDumps[key]
+      if cleared and job and job.id ~= cleared and packet.task == job.id and job.dump
+        and job.dump.x == pos.x and job.dump.y == pos.y and job.dump.z == pos.z then
+        state.clearedDumps[key] = nil
+      end
+      local exists = false
+      for _, point in ipairs(state.waypoints) do
+        if point.kind == "DUMP" and point.pos.x == pos.x and point.pos.y == pos.y
+          and point.pos.z == pos.z then exists = true; break end
+      end
+      if not exists and not state.clearedDumps[key] then
+        state.waypoints[#state.waypoints + 1] = {
+          kind = "DUMP", label = packet.label, block = "Dump chest",
+          pos = { x = pos.x, y = pos.y, z = pos.z },
+        }
+      end
+    end
+  end
   if job and packet.task == job.id then
     job.accepted = true
     job.status = drone.state

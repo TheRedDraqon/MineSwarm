@@ -43,7 +43,8 @@ function M.new(monitor, state, actions)
   end
 
   local function input(x, y, w, label, field)
-    local value = ui.inputField == field and ui.inputBuffer or ui[field]
+    local value = ui.inputField == field and ui.inputBuffer
+      or (field == "fuelPercent" and tostring(state.fuelPercent or 50) or ui[field])
     button(x, y, w, label .. ": " .. value, function()
       ui.inputField, ui.inputBuffer = field, ""
     end, ui.inputField == field and colors.orange or colors.gray, field)
@@ -139,7 +140,7 @@ function M.new(monitor, state, actions)
   end
 
   local function drawWaypoints()
-    line(2, 3, width - 3, "PROTECTED / UNDIGGABLE BLOCKS", colors.cyan)
+    line(2, 3, width - 3, "ORE WAYPOINTS / DUMP CHESTS", colors.cyan)
     local pageSize = height - 8
     local maxPage = math.max(0, math.ceil(#state.waypoints / pageSize) - 1)
     ui.waypointPage = math.min(ui.waypointPage, maxPage)
@@ -155,11 +156,18 @@ function M.new(monitor, state, actions)
     button(13, height - 2, 10, "NEXT >", function() ui.waypointPage = math.min(maxPage, ui.waypointPage + 1) end)
   end
 
+  local function drawSettings()
+    line(2, 3, width - 3, "SETTINGS - applies to new jobs", colors.cyan)
+    input(2, 5, 24, "FUEL %", "fuelPercent")
+    line(2, 7, width - 3, "Tap the field and type a whole percentage from 1 to 100.")
+    line(2, 8, width - 3, "Each turtle uses its own fuel limit.")
+  end
+
   function ui.draw()
     ui.buttons = {}
     monitor.setBackgroundColor(colors.black)
     monitor.clear()
-    local names = { "DRONES", "JOB SETUP", "WAYPOINTS" }
+    local names = { "DRONES", "JOB SETUP", "WAYPOINTS", "SETTINGS" }
     local tabWidth = math.floor(width / #names)
     for index, name in ipairs(names) do
       button((index - 1) * tabWidth + 1, 1, tabWidth, name,
@@ -168,7 +176,8 @@ function M.new(monitor, state, actions)
     line(1, 2, width, "Q: quit master (does not stop drones)", colors.gray)
     if ui.tab == 1 then drawDrones()
     elseif ui.tab == 2 then drawSetup()
-    else drawWaypoints() end
+    elseif ui.tab == 3 then drawWaypoints()
+    else drawSettings() end
     line(1, height, width, ui.message, colors.yellow)
   end
 
@@ -198,7 +207,13 @@ function M.new(monitor, state, actions)
         local origin = ui.inputField == "xInput" or ui.inputField == "zInput"
         local valid = origin and quarries.coordinate(ui.inputBuffer, 0)
           or (not origin and ui.inputBuffer:match("^[+-]?%d+$") and tonumber(ui.inputBuffer))
-        if valid then
+        if ui.inputField == "fuelPercent" then
+          if valid and actions.setFuelPercent(valid) then
+            ui.inputField, ui.inputBuffer = nil, ""
+          else
+            ui.message = "Enter a percentage from 1 to 100"
+          end
+        elseif valid then
           ui[ui.inputField] = ui.inputBuffer
           ui.inputField, ui.inputBuffer = nil, ""
           ui.message = "Value applied"

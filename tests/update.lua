@@ -79,23 +79,24 @@ end
 
 files["/mineswarm/version"] = "0.9.9\n"
 runUpdater("drone")
-assert(files["/mineswarm/version"] == "2.0.3\n")
+assert(files["/mineswarm/version"] == "2.0.5\n")
 assert(files["/mineswarm/drone/main.lua"] ~= nil)
+assert(files["/mineswarm/drone/home.lua"] ~= nil)
 assert(files["/mineswarm/shared/pose.lua"] ~= nil)
 assert(files["/mineswarm/update.lua"] ~= nil)
 local upgradedRequests = requests
 
-files["/mineswarm/version"] = "2.0.3\n"
+files["/mineswarm/version"] = "2.0.5\n"
 requests = 0
 runUpdater("drone")
-assert(files["/mineswarm/version"] == "2.0.3\n", "updater must not downgrade")
+assert(files["/mineswarm/version"] == "2.0.5\n", "updater must not downgrade")
 assert(requests == 1, "an up-to-date or newer client should fetch only the manifest")
 
 files["/mineswarm/version"] = "1.0.0\n"
 files["/mineswarm/drone/main.lua.update.tmp"] = "left over from previous failure"
 writes = {}
 runUpdater("drone")
-assert(files["/mineswarm/version"] == "2.0.3\n")
+assert(files["/mineswarm/version"] == "2.0.5\n")
 assert(files["/mineswarm/drone/main.lua.update.tmp"] == nil)
 assert(#writes == 1 and writes[1] == "/mineswarm/version.update.tmp",
   "unchanged installed files should not be staged again")

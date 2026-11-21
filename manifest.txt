@@ -1,4 +1,4 @@
-version=2.0.3
+version=2.0.5
 
 [common]
 update.lua
@@ -19,6 +19,7 @@ shared/util.lua
 shared/net.lua
 shared/state.lua
 shared/pose.lua
+drone/home.lua
 drone/miner.lua
 drone/main.lua
 

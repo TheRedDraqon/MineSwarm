@@ -44,6 +44,7 @@ package.preload["shared.pose"] = function()
 end
 package.preload["drone.miner"] = function()
   return {
+    refuel = function() return true end,
     run = function(_, _, callbacks)
       callbacks.waitForSpace()
       assert(slots[1] == 0, "miner resumed before the inventory was cleared")

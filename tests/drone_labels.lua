@@ -20,7 +20,8 @@ package.preload["shared.pose"] = function()
     return { x = 0, y = 0, z = 0, dir = 0 }
   end }
 end
-package.preload["drone.miner"] = function() return {} end
+package.preload["drone.miner"] = function() return { refuel = function() return true end } end
+turtle = { getFuelLevel = function() return "unlimited" end }
 os.getComputerLabel = function() return label end
 os.setComputerLabel = function(value) setLabel, label = value, value end
 os.getComputerID = function() return 123 end

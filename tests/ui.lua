@@ -22,6 +22,11 @@ local called
 local ui = dofile("master/ui.lua").new(monitor, state, {
   launch = function(...) called = { ... } end,
   command = function() end, clearWaypoint = function() end,
+  setFuelPercent = function(value)
+    if value < 1 or value > 100 then return false end
+    state.fuelPercent = value
+    return true
+  end,
 })
 ui.draw()
 ui.touch(3, 5)
@@ -37,4 +42,15 @@ assert(ui.xInput == "~-5")
 ui.draw()
 ui.touch(3, 27)
 assert(called and called[1] == "Drone1" and called[2] == "~-5" and called[4] == "Osmium")
+ui.draw()
+ui.touch(70, 1)
+ui.draw()
+ui.touch(3, 5)
+for char in ("75"):gmatch(".") do ui.handleInput("char", char) end
+ui.handleInput("key", keys.enter)
+assert(state.fuelPercent == 75)
+ui.touch(3, 5)
+for char in ("101"):gmatch(".") do ui.handleInput("char", char) end
+ui.handleInput("key", keys.enter)
+assert(state.fuelPercent == 75 and ui.inputField == "fuelPercent")
 print("MineSwarm monitor input tests passed")

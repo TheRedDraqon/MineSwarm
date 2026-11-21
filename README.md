@@ -9,12 +9,16 @@ FOB configuration, or shared swarm job.
 
 - One master computer with an Advanced Monitor (at least 48x19 characters at
   text scale 0.5) and a modem.
-- A labeled mining turtle with a modem, mining upgrade and enough fuel.
+- A labeled mining turtle with a modem on the left and a mining upgrade on
+  the right.
 - Working CC:Tweaked GPS coverage at each turtle, using at least four GPS
   hosts in the turtle's dimension. All MineSwarm nodes use channel 9001;
   wireless modems need sufficient range. Use Ender Modems if necessary.
-- Optionally, put a chest directly behind the stationary turtle before
-  assigning its job. A block whose ID ends in `chest` is recognized as a chest.
+- A charcoal-only chest directly above each turtle's surface home and an item
+  chest directly behind it. The intended chests are `enderchests:ender_chest`;
+  other block IDs ending in `chest` are also accepted.
+- Optionally, an `advancedperipherals:end_automata_core` in the turtle's
+  inventory. Without one, the turtle walks between home and its quarry.
 
 Restrict modem access to trusted players: messages are not authenticated.
 
@@ -51,8 +55,10 @@ configuration, or state.
 
 ## Assigning a job
 
-1. Start the turtle with GPS available and wait for it to appear on **DRONES**.
-   Select its label and touch **SET UP JOB**.
+1. Place the turtle at its surface home facing north, with a charcoal supply
+   chest above it and an item chest behind it. With GPS available, start the
+   drone, wait for it to appear on **DRONES**, select its label, and touch
+   **SET UP JOB**.
 2. Tap **END X** and **END Z**, type a coordinate on the master computer
    keyboard, and press Enter. A plain number is an absolute coordinate; `~`
    means the drone's current coordinate, and `~10` / `~-10` are offsets.
@@ -68,25 +74,51 @@ direction. The master rejects an assignment if the drone is busy/offline or
 its X/Z footprint overlaps an active job, including an offline job. A drone
 rejects an assignment if its position changed since the last heartbeat.
 
+The turtle uses the original surface home for fuel and item storage; new jobs
+do not place an underground chest. Existing recorded dump waypoints remain
+protected until they are cleared.
+
 Use **DRONES** to see positions, fuel, inventory and active column progress,
 or to pause and resume that drone. The master can be closed with **Q**
-without stopping drones. Completion leaves a drone at its last column.
+without stopping drones. On completion, the turtle deposits remaining items
+at home and faces north.
 
 ## Inventory and safety
 
-At assignment the drone checks behind itself for a chest and saves that
-location. When all 16 slots are occupied, it returns to that chest, verifies
-it is still present, deposits the inventory, and resumes the job. If the
-chest is missing, full, unreachable, or fuel is exhausted, the job reports
-an error. A full-inventory return will not dig new blocks on the way, to avoid
-losing items; keep the return path clear. Keep enough fuel for mining and
-return trips; automatic refueling is not provided.
+The **SETTINGS** tab sets the fuel target for new jobs as a percentage of
+each turtle's fuel limit; the default is 50%. The setting persists on the
+master and does not change active jobs. At home the turtle takes only
+`minecraft:charcoal` from the chest above and refuels to the target, or higher
+when necessary for a safe return. When fuel reaches the estimated walking
+distance home plus 100, it returns for more. If the chest is empty, missing,
+contains the wrong item, or the turtle cannot refuel enough, correct the
+problem and press **RESUME**.
 
-If no chest was detected, a full inventory pauses the drone in place. Manually
-clear at least one slot, then select that drone on the master and touch
-**RESUME**. A resume request while all slots are occupied leaves it paused.
-The inventory is considered full when no empty slot remains, even if an
-existing stack has room.
+When all 16 slots are occupied, the turtle returns home, deposits items in
+the chest behind it, and resumes. It keeps charcoal and the End Automata Core.
+If the item chest or warp destination is unavailable, the drone pauses with
+an error; fix the problem and press **RESUME**. An inventory is considered
+full when no slot is empty, even if an existing stack has room. A walking
+return with a full inventory cannot dig an obstructed path; clear a slot or
+the path and press **RESUME**.
+
+At a valid home, a core is temporarily equipped in the right slot and its
+`Home` point is saved. The mining upgrade is restored afterwards. For
+servicing, the core saves `MineSwarmWork`, warps home, then warps back to
+that work point; the turtle checks GPS after each warp. Warp fuel costs,
+cooldowns, blocked destinations and unavailable chunks are controlled by
+Advanced Peripherals and the server. Keep home and the quarry loaded and
+covered by GPS. The saved home is retained across restarts and is not
+silently moved if the turtle reboots elsewhere. An existing `Home` point at
+another location is rejected rather than overwritten.
+
+Finish active jobs before moving a turtle to a new home. Back up its state
+and clear the old saved home and the core's `Home` point deliberately before
+registering the new location. Do not remove or change the core, mining
+upgrade, or their inventory slot while the drone is running.
+
+Jobs already active before version 2.0.5 retain their previous coal and dump
+behavior. Restart both the master and turtles to use the new job format.
 
 Turtles attempt to dig blocks without filtering their names or tags. This
 includes chests and other breakable blocks, so keep valuables and other turtles
@@ -100,7 +132,8 @@ or return path also stops the job with an error.
 
 This is not a general pathfinder: travel may dig a vertical shaft from the
 starting position to one block above the selected Y range, and it may clear
-blocks in that movement layer. Check the area and test a small job first.
+blocks in that movement layer. Keep the two home chests outside all quarry
+and travel paths. Check the area and test a small job first.
 It does not automatically reassign offline drones. The ore presets came from
 the previous ATM9 Mining Dimension configuration and should be checked against
 the server's actual pack version and dimension.
@@ -119,9 +152,11 @@ From the project directory:
 
 ```sh
 lua tests/quarries.lua && lua tests/master_jobs.lua && lua tests/ui.lua && lua tests/miner.lua \
-  && lua tests/drone_pause.lua && lua tests/drone_labels.lua \
+  && lua tests/logistics.lua && lua tests/drone_pause.lua && lua tests/drone_fuel_pause.lua \
+  && lua tests/drone_home.lua && lua tests/drone_labels.lua \
   && lua tests/installer_labels.lua && lua tests/pose.lua && lua tests/update.lua
 ```
 
-Also run `luac -p` on Lua files. Test GPS, chest access, fuel, and protected
-blocks in the actual game before launching a large quarry.
+Also run `luac -p` on Lua files. Test GPS, chest access, fuel, core swaps,
+warping, and protected blocks in the actual game before launching a large
+quarry.
